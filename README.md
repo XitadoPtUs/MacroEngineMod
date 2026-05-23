@@ -1,9 +1,5 @@
 # MacroEngineMod
 
-Standalone Forge 1.8.9 client macro editor and runner.
-
-The mod now uses the `github.xitadoptus` package/group and ships with an empty macro configuration. It does not install example macros or example event scripts.
-
 ## Build
 
 Use Java 8 and the included Gradle wrapper. ForgeGradle 2.1 does not work with modern global Gradle installs, and Gradle versions old enough for ForgeGradle 2.1 cannot run on Java 22.
