@@ -24,7 +24,3 @@ desktop.ini
 crash-reports/
 hs_err_pid*
 replay_pid*
-
-# Local agent/session files
-.agents/
-.codex/
