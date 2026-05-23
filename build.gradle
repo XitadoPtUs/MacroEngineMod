@@ -1,0 +1,83 @@
+buildscript {
+    ext.kotlin_version = "1.3.72"
+
+    repositories {
+        mavenCentral()
+        maven {
+            name = "JCenter"
+            url = "https://jcenter.bintray.com/"
+        }
+        maven {
+            name = "Forge"
+            url = "https://maven.minecraftforge.net/"
+        }
+        maven {
+            name = "SonatypeSnapshots"
+            url = "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:2.1-SNAPSHOT"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
+    }
+}
+
+apply plugin: "net.minecraftforge.gradle.forge"
+apply plugin: "kotlin"
+
+group = mod_group
+version = mod_version
+archivesBaseName = mod_name
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+minecraft {
+    version = forge_version
+    runDir = "run"
+    mappings = mappings_version
+    makeObfSourceJar = false
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    shade
+    compile.extendsFrom(shade)
+}
+
+dependencies {
+    shade "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "mcversion", "1.8.9"
+
+    from(sourceSets.main.resources.srcDirs) {
+        include "mcmod.info"
+        expand "version": project.version, "mcversion": "1.8.9"
+    }
+
+    from(sourceSets.main.resources.srcDirs) {
+        exclude "mcmod.info"
+    }
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.shade.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    exclude "META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA"
+}

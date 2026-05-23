@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+
+# ForgeGradle / Minecraft dev runtime
+run/
+eclipse/
+*.launch
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and crash reports
+*.log
+crash-reports/
+hs_err_pid*
+replay_pid*
+
+# Local agent/session files
+.agents/
+.codex/

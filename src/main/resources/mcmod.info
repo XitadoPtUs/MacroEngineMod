@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "macroengine",
+    "name": "MacroEngine",
+    "description": "Standalone Forge 1.8.9 macro editor and runner.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["xitadoptus"],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
