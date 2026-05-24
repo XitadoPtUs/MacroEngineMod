@@ -2,11 +2,15 @@ package github.xitadoptus.macro
 
 import github.xitadoptus.macro.engine.MacroRuntime
 import github.xitadoptus.macro.gui.MacroScreen
+import github.xitadoptus.macro.recorder.MacroRecorder
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
+import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback
+import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ChatScreen
+import net.minecraft.resources.ResourceLocation
 import java.io.File
 
 object MacroMod : ClientModInitializer {
@@ -29,6 +33,12 @@ object MacroMod : ClientModInitializer {
             MacroRuntime.onClientTick(client)
             openPendingGui(client)
         }
+
+        HudLayerRegistrationCallback.EVENT.register(HudLayerRegistrationCallback { layers ->
+            layers.attachLayerAfter(IdentifiedLayer.SUBTITLES, ResourceLocation.fromNamespaceAndPath(MOD_ID, "recorder_overlay")) { graphics, _ ->
+                MacroRecorder.renderOverlay(graphics)
+            }
+        })
 
         ClientReceiveMessageEvents.CHAT.register { message, _, _, _, _ ->
             MacroRuntime.onChat(message.string)

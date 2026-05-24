@@ -5,6 +5,7 @@ import github.xitadoptus.macro.engine.MacroEntry
 import github.xitadoptus.macro.engine.MacroEventBinding
 import github.xitadoptus.macro.engine.MacroRuntime
 import github.xitadoptus.macro.engine.MacroStorage
+import github.xitadoptus.macro.recorder.MacroRecorder
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
 import net.minecraft.client.gui.GuiGraphics
@@ -24,7 +25,10 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     private var nameField: EditBox? = null
     private var editor = TextEditor()
     private var waitingForBind = false
+    private var waitingForRecorderStopBind = false
     private var bindButton: Button? = null
+    private var recorderButton: Button? = null
+    private var recorderStopButton: Button? = null
     private var runButton: Button? = null
     private var deleteButton: Button? = null
     private var enabledButton: Button? = null
@@ -50,6 +54,8 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         addButton(2, left + listWidth + 16, buttonY, 62, 20, "Save")
         runButton = addButton(4, left + listWidth + 84, buttonY, 62, 20, "Run")
         bindButton = addButton(5, left + listWidth + 152, buttonY, 72, 20, "Bind")
+        recorderButton = addButton(9, left + listWidth + 230, buttonY, 104, 20, "Start Recorder")
+        recorderStopButton = addButton(10, left + listWidth + 340, buttonY, 104, 20, "Stop: ${MacroStorage.config.recorderStopKey}")
         addButton(0, right - 62, buttonY, 62, 20, "Back")
 
         nameField = EditBox(font, left + listWidth + 18, top + 46, right - left - listWidth - 36, 18, Component.literal("")).also {
@@ -87,8 +93,14 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
 
         if (mode == Mode.MACROS) {
             val currentKey = currentMacro()?.key ?: "NONE"
-            val keyText = if (waitingForBind) "Press a supported key..." else "Key: $currentKey"
-            graphics.drawString(font, MacroFonts.text(keyText), right - 190, top + 13, Color(190, 195, 205).rgb, true)
+            val keyText = when {
+                waitingForBind -> "Press a supported key..."
+                waitingForRecorderStopBind -> "Recorder stop: press a supported key..."
+                else -> "Key: $currentKey"
+            }
+            val keyComponent = MacroFonts.text(keyText)
+            val keyX = (right - font.width(keyComponent) - 12).coerceAtLeast(left + listWidth + 18)
+            graphics.drawString(font, keyComponent, keyX, top + 13, Color(190, 195, 205).rgb, true)
         }
 
         editor.render(graphics, font)
@@ -139,6 +151,11 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        if (waitingForRecorderStopBind) {
+            bindRecorderStopKey(keyCode)
+            return true
+        }
+
         if (waitingForBind) {
             bindKey(keyCode)
             return true
@@ -203,6 +220,11 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             6 -> toggleEnabled()
             7 -> switchMode(Mode.MACROS)
             8 -> switchMode(Mode.EVENTS)
+            9 -> startRecorder()
+            10 -> {
+                waitingForRecorderStopBind = true
+                waitingForBind = false
+            }
         }
         refreshButtons()
     }
@@ -245,6 +267,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         selectedIndex = 0
         listScroll = 0
         waitingForBind = false
+        waitingForRecorderStopBind = false
         loadSelection()
     }
 
@@ -330,6 +353,31 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         }
     }
 
+    private fun bindRecorderStopKey(keyCode: Int) {
+        waitingForRecorderStopBind = false
+        if (keyCode == InputConstants.KEY_ESCAPE || keyCode == InputConstants.KEY_BACKSPACE) {
+            MacroStorage.config.recorderStopKey = "RSHIFT"
+            MacroRuntime.save()
+            return
+        }
+
+        val normalized = KeyboardUtils.normalizeKey(KeyboardUtils.keyNameFromCode(keyCode))
+        if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") {
+            MacroStorage.config.recorderStopKey = normalized
+            MacroRuntime.save()
+        } else {
+            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Unsupported recorder stop key: \u00A7f$normalized")
+        }
+    }
+
+    private fun startRecorder() {
+        saveSelection()
+        MacroRuntime.save()
+        if (MacroRecorder.start(MacroStorage.config.recorderStopKey)) {
+            minecraft!!.setScreen(null)
+        }
+    }
+
     private fun saveAndClose() {
         saveSelection()
         MacroRuntime.save()
@@ -338,6 +386,8 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
 
     private fun refreshButtons() {
         bindButton?.active = mode == Mode.MACROS && currentMacro() != null
+        recorderButton?.active = !MacroRecorder.active
+        recorderStopButton?.message = MacroFonts.text(if (waitingForRecorderStopBind) "Press key" else "Stop: ${MacroStorage.config.recorderStopKey}")
         runButton?.active = if (mode == Mode.MACROS) currentMacro() != null else currentEvent() != null
         deleteButton?.active = itemLabels().isNotEmpty()
         enabledButton?.message = MacroFonts.text(if (currentEnabled()) "Enabled" else "Disabled")

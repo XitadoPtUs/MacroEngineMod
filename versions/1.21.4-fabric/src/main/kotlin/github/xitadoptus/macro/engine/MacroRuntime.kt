@@ -2,6 +2,7 @@ package github.xitadoptus.macro.engine
 
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
+import github.xitadoptus.macro.recorder.MacroRecorder
 import net.minecraft.client.Minecraft
 import java.util.Collections
 import java.util.UUID
@@ -100,6 +101,7 @@ object MacroRuntime {
             previousKeyState.clear()
             return
         }
+        if (MacroRecorder.onClientTick(client)) return
         if (client.screen != null) return
 
         MacroStorage.config.macros
