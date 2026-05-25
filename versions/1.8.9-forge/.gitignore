@@ -1,28 +1,26 @@
+# Gradle
 .gradle/
 build/
-out/
-classes/
+
+# ForgeGradle / Minecraft dev runtime
 run/
 eclipse/
 *.launch
+
+# IDEs
 .idea/
 *.iml
 *.ipr
 *.iws
-.settings/
 .vscode/
-bin/
-.classpath
-.project
+
+# OS files
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Logs and crash reports
 *.log
 crash-reports/
 hs_err_pid*
 replay_pid*
-*.hprof
-*.jfr
-**/.gradle/
-**/build/
-**/run/

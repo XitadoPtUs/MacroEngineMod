@@ -1,40 +1,8 @@
 # MacroEngineMod
 
-## Versions
-
-This repository keeps each Minecraft target in its own Gradle project:
-
-| Version | Loader | Path |
-| --- | --- | --- |
-| 1.8.9 | Forge | `versions/1.8.9-forge` |
-| 1.21.4 | Fabric | `versions/1.21.4-fabric` |
-| Other versions | Fabric | `versions/<version>-fabric` |
-
-The root Gradle project only exposes helper tasks so IntelliJ can choose the target version from one workspace:
-
-```bat
-gradlew.bat buildFabric1214
-gradlew.bat testFabric1214
-gradlew.bat runFabric1214
-gradlew.bat setupForge189
-gradlew.bat buildForge189
-gradlew.bat runForge189
-```
-
-You can open the repository root in IntelliJ to see these tasks, or open a specific version folder directly.
-
-## Build Forge 1.8.9
+## Build
 
 Use Java 8 and the included Gradle wrapper. ForgeGradle 2.1 does not work with modern global Gradle installs, and Gradle versions old enough for ForgeGradle 2.1 cannot run on Java 22.
-
-From the repository root:
-
-```bat
-gradlew.bat setupForge189
-gradlew.bat buildForge189
-```
-
-Or directly from `versions/1.8.9-forge`:
 
 ```bash
 ./gradlew setupDecompWorkspace
@@ -45,7 +13,7 @@ On Windows, use `gradlew.bat setupDecompWorkspace` and `gradlew.bat build`.
 
 Java 22 can stay installed for other projects, but this project should be built with a JDK 8 `JAVA_HOME`. Minecraft Forge 1.8.9 expects Java 8-compatible bytecode.
 
-The Forge mod jar is generated in `versions/1.8.9-forge/build/libs`.
+The mod jar is generated in `build/libs`.
 
 To run the dev client from IntelliJ, use the Gradle run configuration named `Minecraft Client` or run:
 
@@ -60,28 +28,6 @@ gradlew.bat runClient
 ```
 
 Do not run an IntelliJ `Application` configuration with main class `GradleStart` unless its module classpath includes ForgeGradle's generated start classes. Running it as a Gradle task avoids the `Could not find or load main class GradleStart` error.
-
-## Build Fabric 1.21.4
-
-Use Java 21 or newer.
-
-From the repository root:
-
-```bat
-gradlew.bat buildFabric1214
-gradlew.bat runFabric1214
-```
-
-Or directly from `versions/1.21.4-fabric`:
-
-```bat
-gradlew.bat build
-gradlew.bat runClient
-```
-
-The Fabric mod jar is generated in `versions/1.21.4-fabric/build/libs`.
-
-The Fabric source is Kotlin-only and lives under `versions/1.21.4-fabric/src/main/kotlin/github/xitadoptus/macro`.
 
 ## In Game
 
@@ -130,8 +76,7 @@ The main config file is `.minecraft/macroengine/macros/macros.json`. Saving also
 }
 ```
 
-On Forge 1.8.9, `key` uses LWJGL keyboard names, for example `R`, `F`, `LCONTROL`, or `NONE`.
-On Fabric 1.21.4, `key` accepts modern key names and legacy aliases such as `R`, `F`, `LCTRL`, `LCONTROL`, `MOUSE1`, or `NONE`.
+`key` uses LWJGL keyboard names, for example `R`, `F`, `LCONTROL`, or `NONE`.
 
 ## Script Syntax
 

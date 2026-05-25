@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "macroengine",
+  "version": "${version}",
+  "name": "MacroEngine",
+  "description": "Fabric macro editor and runner.",
+  "authors": [
+    "Xitado",
+    "Lopes"
+  ],
+  "license": "CC0-1.0",
+  "icon": "assets/macroengine/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      {
+        "value": "github.xitadoptus.macro.MacroMod",
+        "adapter": "kotlin"
+      }
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.2",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*",
+    "fabric-language-kotlin": "*"
+  }
+}
