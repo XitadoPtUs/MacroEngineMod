@@ -28,7 +28,7 @@ You can open the repository root in IntelliJ to see these tasks, or open a speci
 Use Java 8 and the included Gradle wrapper. ForgeGradle 2.1 does not work with modern global Gradle installs, and Gradle versions old enough for ForgeGradle 2.1 cannot run on Java 22.
 
 From the repository root:
-
+ 
 ```bat
 gradlew.bat setupForge189
 gradlew.bat buildForge189
