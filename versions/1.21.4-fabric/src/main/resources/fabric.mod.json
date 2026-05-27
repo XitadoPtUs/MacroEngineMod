@@ -6,7 +6,8 @@
   "description": "Fabric macro editor and runner.",
   "authors": [
     "Xitado",
-    "Lopes"
+    "Lopes",
+    "rasketeki"
   ],
   "license": "CC0-1.0",
   "icon": "assets/macroengine/icon.png",

@@ -13,4 +13,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "macroengine-1.21.4-fabric"
+rootProject.name = "1.21.4-fabric"

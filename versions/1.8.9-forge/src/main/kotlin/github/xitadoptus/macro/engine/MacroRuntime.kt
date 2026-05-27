@@ -28,9 +28,13 @@ object MacroRuntime : MinecraftInstance() {
     val labels: ConcurrentHashMap<String, String> = ConcurrentHashMap()
     @Volatile
     var currentConfigName: String = "default"
+    @Volatile
     private var loaded = false
+
+    @Volatile
     private var lastWorldPresent = false
 
+    @Synchronized
     fun ensureLoaded() {
         if (!loaded) {
             MacroStorage.load()

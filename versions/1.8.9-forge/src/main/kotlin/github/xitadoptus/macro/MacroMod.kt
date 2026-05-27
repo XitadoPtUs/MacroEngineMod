@@ -17,7 +17,7 @@ import java.io.File
     modid = MacroMod.MOD_ID,
     name = MacroMod.NAME,
     version = MacroMod.VERSION,
-    acceptedMinecraftVersions = "[1.8.9]",
+    acceptedMinecraftVersions = "[1.8,1.8.9]",
     acceptableRemoteVersions = "*",
     clientSideOnly = true
 )
