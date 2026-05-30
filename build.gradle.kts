@@ -1,11 +1,27 @@
 plugins {
     base
+    `java-base`
 }
 
 val windows = System.getProperty("os.name").lowercase().contains("windows")
 
 fun wrapper(path: String): String {
-    return file("$path/${if (windows) "gradlew.bat" else "gradlew"}").absolutePath
+    val gradlewName = if (windows) "gradlew.bat" else "gradlew"
+    val wrapperFile = file("$path/$gradlewName")
+    if (!wrapperFile.exists()) {
+        throw GradleException(
+            "Gradle wrapper not found at ${wrapperFile.absolutePath}.\n" +
+            "Please ensure that the subproject has a Gradle wrapper configured (e.g. running 'gradle wrapper' inside it)."
+        )
+    }
+    if (!windows) {
+        try {
+            wrapperFile.setExecutable(true)
+        } catch (e: Exception) {
+            project.logger.warn("Failed to set executable permissions on ${wrapperFile.absolutePath}: ${e.message}")
+        }
+    }
+    return wrapperFile.absolutePath
 }
 
 fun Exec.versionTask(path: String, vararg args: String) {
@@ -13,22 +29,65 @@ fun Exec.versionTask(path: String, vararg args: String) {
     commandLine(wrapper(path), *args)
 }
 
-fun Exec.applyJava8IfConfigured() {
-    val java8Home = providers.gradleProperty("java8Home").orElse(providers.environmentVariable("JAVA8_HOME")).orNull
-    if (!java8Home.isNullOrBlank()) {
-        environment("JAVA_HOME", java8Home)
-    } else {
-        try {
-            val javaToolchains = project.extensions.getByType<JavaToolchainService>()
-            val compiler = javaToolchains.compilerFor {
-                languageVersion.set(JavaLanguageVersion.of(8))
+fun getJavaVersionForMinecraft(mcVersion: String): Int {
+    val parts = mcVersion.split(".")
+    if (parts.isNotEmpty()) {
+        val major = parts[0].toIntOrNull() ?: 1
+        val minor = if (parts.size > 1) parts[1].toIntOrNull() ?: 0 else 0
+        val patch = if (parts.size > 2) parts[2].toIntOrNull() ?: 0 else 0
+        
+        if (major == 1) {
+            if (minor >= 21 || (minor == 20 && patch >= 5)) {
+                return 21
             }
-            environment("JAVA_HOME", compiler.get().metadata.installationPath.asFile.absolutePath)
+            if (minor >= 17) {
+                return 17
+            }
+        }
+    }
+    return 8
+}
+
+fun Exec.applyJavaVersionIfConfigured(version: Int) {
+    val javaHome = providers.gradleProperty("java${version}Home").orElse(providers.environmentVariable("JAVA${version}_HOME")).orNull
+    if (!javaHome.isNullOrBlank()) {
+        environment("JAVA_HOME", javaHome)
+    } else {
+        var foundJdk = false
+        try {
+            val javaToolchains = project.extensions.findByType<JavaToolchainService>()
+            if (javaToolchains != null) {
+                val compiler = javaToolchains.compilerFor {
+                    languageVersion.set(JavaLanguageVersion.of(version))
+                }
+                val path = compiler.get().metadata.installationPath.asFile.absolutePath
+                environment("JAVA_HOME", path)
+                foundJdk = true
+            }
         } catch (e: Exception) {
 
         }
+        
+        if (!foundJdk) {
+            val currentJava = System.getProperty("java.version")
+            val matches = when (version) {
+                8 -> currentJava.startsWith("1.8") || currentJava.startsWith("8.")
+                17 -> currentJava.startsWith("17.")
+                21 -> currentJava.startsWith("21.")
+                else -> currentJava.startsWith("$version.")
+            }
+            if (!matches) {
+                project.logger.warn("--------------------------------------------------------------------------------")
+                project.logger.warn("WARNING: Building this project requires Java $version.")
+                project.logger.warn("Currently running with Java $currentJava.")
+                project.logger.warn("Please install Java $version or set the 'java${version}Home' property / 'JAVA${version}_HOME' env variable.")
+                project.logger.warn("The build might fail if the subproject cannot compile.")
+                project.logger.warn("--------------------------------------------------------------------------------")
+            }
+        }
     }
 }
+
 
 val versionsDir = file("versions")
 if (versionsDir.exists() && versionsDir.isDirectory) {
@@ -42,25 +101,26 @@ if (versionsDir.exists() && versionsDir.isDirectory) {
             val suffix = "$loaderCapitalized$versionClean"
             
             val isForge = loader.lowercase() == "forge"
+            val javaVersion = getJavaVersionForMinecraft(version)
             
             tasks.register<Exec>("build$suffix") {
                 group = "versions"
                 description = "Builds the $loader mod for Minecraft $version"
-                if (isForge) applyJava8IfConfigured()
+                applyJavaVersionIfConfigured(javaVersion)
                 versionTask(dir.path, "build")
             }
             
             tasks.register<Exec>("clean$suffix") {
                 group = "versions"
                 description = "Cleans the $loader project build directory for Minecraft $version"
-                if (isForge) applyJava8IfConfigured()
+                applyJavaVersionIfConfigured(javaVersion)
                 versionTask(dir.path, "clean")
             }
             
             tasks.register<Exec>("run$suffix") {
                 group = "versions"
                 description = "Runs the $loader client for Minecraft $version"
-                if (isForge) applyJava8IfConfigured()
+                applyJavaVersionIfConfigured(javaVersion)
                 versionTask(dir.path, "runClient")
             }
             
@@ -68,13 +128,14 @@ if (versionsDir.exists() && versionsDir.isDirectory) {
                 tasks.register<Exec>("setup$suffix") {
                     group = "versions"
                     description = "Sets up the Forge decomp workspace for Minecraft $version"
-                    applyJava8IfConfigured()
+                    applyJavaVersionIfConfigured(javaVersion)
                     versionTask(dir.path, "setupDecompWorkspace")
                 }
             } else {
                 tasks.register<Exec>("test$suffix") {
                     group = "versions"
                     description = "Runs tests for the Fabric project on Minecraft $version"
+                    applyJavaVersionIfConfigured(javaVersion)
                     versionTask(dir.path, "test")
                 }
             }

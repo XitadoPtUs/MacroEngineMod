@@ -198,6 +198,8 @@ Key macros receive `%KEYNAME%` and `%KEYID%` locals.
 | `LOG(text)` | Prints a colored client chat message. |
 | `LOGRAW(json)` | Prints a raw JSON chat component, falling back to plain text. |
 | `WAIT(value)` | Sleeps. Supports seconds, `ms`, and ticks with `t`. |
+| `WAITUNTIL(condition)` | Pauses execution until the condition becomes true. Rechecks every 50ms. |
+| `WAITWHILE(condition)` | Pauses execution while the condition remains true. Rechecks every 50ms. |
 | `EXEC(file, reason, arg0, arg1...)` | Runs a script file from the macro folder. Extra args are locals `%0%`, `%1%`, etc. |
 | `STOP()` | Stops the current macro. |
 | `STOP(name)` | Stops running macros whose id contains `name`. |

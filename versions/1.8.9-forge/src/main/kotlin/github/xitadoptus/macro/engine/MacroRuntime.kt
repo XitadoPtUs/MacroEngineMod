@@ -126,8 +126,8 @@ object MacroRuntime : MinecraftInstance() {
     @SubscribeEvent
     fun onChat(event: ClientChatReceivedEvent) {
         ensureLoaded()
-        val message = event.message?.unformattedText ?: return
-        fireEvent("onChat", mapOf("CHAT" to message, "CHATCLEAN" to message))
+        val message = event.message?.formattedText ?: return
+        fireEvent("onChat", mapOf("CHAT" to message, "CHATCLEAN" to net.minecraft.util.EnumChatFormatting.getTextWithoutFormattingCodes(message)))
     }
 
     private fun updateWorldState() {

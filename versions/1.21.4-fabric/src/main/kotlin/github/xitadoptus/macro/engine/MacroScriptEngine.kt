@@ -253,6 +253,8 @@ class MacroScriptEngine(
             "LOG" -> if (args.isNotEmpty()) ClientUtils.displayChatMessage(ClientUtils.color(args.joinToString(",")))
             "LOGRAW" -> if (args.isNotEmpty()) ClientUtils.displayChatMessage(args.joinToString(","))
             "WAIT" -> sleepInterruptibly(parseWait(args.firstOrNull() ?: "1"))
+            "WAITUNTIL" -> waitUntil(statement.args.getOrNull(0).orEmpty())
+            "WAITWHILE" -> waitWhile(statement.args.getOrNull(0).orEmpty())
             "EXEC" -> execFile(args)
             "STOP" -> stopMacro(args.firstOrNull())
             "ASSIGN" -> assignVar(statement.args)
@@ -1159,6 +1161,22 @@ class MacroScriptEngine(
             val chunk = remaining.coerceAtMost(50L)
             Thread.sleep(chunk)
             remaining -= chunk
+        }
+    }
+
+    private fun waitUntil(rawCondition: String) {
+        while (true) {
+            if (!runningTasks.contains(taskId)) throw StopMacro()
+            if (evalCondition(rawCondition)) break
+            Thread.sleep(50L)
+        }
+    }
+
+    private fun waitWhile(rawCondition: String) {
+        while (true) {
+            if (!runningTasks.contains(taskId)) throw StopMacro()
+            if (!evalCondition(rawCondition)) break
+            Thread.sleep(50L)
         }
     }
 

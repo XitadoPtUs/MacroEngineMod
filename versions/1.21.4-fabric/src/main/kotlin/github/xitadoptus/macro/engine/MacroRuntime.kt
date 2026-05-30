@@ -35,6 +35,7 @@ object MacroRuntime {
     @Volatile
     private var lastWorldPresent = false
 
+    @Synchronized
     fun ensureLoaded() {
         if (!loaded) {
             MacroStorage.load()
