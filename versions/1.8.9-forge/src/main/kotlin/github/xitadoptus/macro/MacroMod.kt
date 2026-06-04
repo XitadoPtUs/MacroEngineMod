@@ -2,6 +2,7 @@ package github.xitadoptus.macro
 
 import github.xitadoptus.macro.engine.MacroRuntime
 import github.xitadoptus.macro.gui.GuiMacroEngine
+import github.xitadoptus.macro.update.UpdateChecker
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiChat
 import net.minecraftforge.client.ClientCommandHandler
@@ -35,9 +36,11 @@ class MacroMod {
 
     @SubscribeEvent
     fun onClientTick(event: TickEvent.ClientTickEvent) {
-        if (event.phase != TickEvent.Phase.END || !pendingGuiOpen) return
-
+        if (event.phase != TickEvent.Phase.END) return
         val mc = Minecraft.getMinecraft()
+        UpdateChecker.onClientTick(mc)
+
+        if (!pendingGuiOpen) return
         if (mc.currentScreen is GuiChat) return
 
         pendingGuiOpen = false

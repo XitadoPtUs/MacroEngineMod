@@ -1,5 +1,6 @@
 package github.xitadoptus.macro.engine
 
+import github.xitadoptus.macro.gui.GuiMacroRuntimeViewer
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
 import github.xitadoptus.macro.util.MinecraftInstance
@@ -15,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object MacroRuntime : MinecraftInstance() {
     private val previousKeyState = ConcurrentHashMap<String, Boolean>()
     private val running: MutableSet<String> = Collections.newSetFromMap(ConcurrentHashMap())
+    private val runningLabels = ConcurrentHashMap<String, String>()
     private val threadCounter = AtomicInteger()
     private val executor = Executors.newCachedThreadPool { runnable ->
         Thread(runnable, "MacroEngine-${threadCounter.incrementAndGet()}").apply {
@@ -33,6 +35,7 @@ object MacroRuntime : MinecraftInstance() {
 
     @Volatile
     private var lastWorldPresent = false
+    private var runtimeViewerWasPressed = false
 
     @Synchronized
     fun ensureLoaded() {
@@ -61,6 +64,7 @@ object MacroRuntime : MinecraftInstance() {
         ensureLoaded()
         val id = "$reason-${UUID.randomUUID()}"
         running += id
+        runningLabels[id] = reason
 
         executor.execute {
             try {
@@ -70,6 +74,7 @@ object MacroRuntime : MinecraftInstance() {
                 ClientUtils.logError("[MacroEngine] Macro '$reason' failed", t)
             } finally {
                 running -= id
+                runningLabels.remove(id)
             }
         }
     }
@@ -82,9 +87,23 @@ object MacroRuntime : MinecraftInstance() {
         return running.toList()
     }
 
-    fun stopMatching(name: String) {
-        if (name.isBlank()) return
-        running.removeIf { it.startsWith(name, ignoreCase = true) || it.contains(name, ignoreCase = true) }
+    fun runningNames(): List<String> {
+        return running.toList().map { runningLabels[it] ?: it.substringBeforeLast("-") }.distinct()
+    }
+
+    fun stopMatching(name: String): Boolean {
+        if (name.isBlank()) return false
+        val before = running.size
+        running.removeIf {
+            it.startsWith(name, ignoreCase = true) ||
+                it.contains(name, ignoreCase = true) ||
+                (runningLabels[it]?.contains(name, ignoreCase = true) == true)
+        }
+        val stopped = running.size != before
+        if (stopped) {
+            runningLabels.entries.removeIf { it.value.contains(name, ignoreCase = true) }
+        }
+        return stopped
     }
 
     fun fireEvent(event: String, locals: Map<String, String> = emptyMap()) {
@@ -101,8 +120,10 @@ object MacroRuntime : MinecraftInstance() {
         updateWorldState()
         if (mc.theWorld == null || mc.thePlayer == null) {
             previousKeyState.clear()
+            runtimeViewerWasPressed = false
             return
         }
+        handleRuntimeViewerKey()
         if (mc.currentScreen != null) return
 
         MacroStorage.config.macros
@@ -139,5 +160,15 @@ object MacroRuntime : MinecraftInstance() {
             fireEvent("onWorldChange")
         }
         lastWorldPresent = present
+    }
+
+    private fun handleRuntimeViewerKey() {
+        val viewerKey = KeyboardUtils.normalizeKey(MacroStorage.config.runtimeViewerKey)
+        if (!KeyboardUtils.isValidKeyName(viewerKey) || viewerKey == "NONE") return
+        val pressed = KeyboardUtils.isInputPressed(viewerKey)
+        if (pressed && !runtimeViewerWasPressed && mc.currentScreen == null) {
+            mc.displayGuiScreen(GuiMacroRuntimeViewer())
+        }
+        runtimeViewerWasPressed = pressed
     }
 }

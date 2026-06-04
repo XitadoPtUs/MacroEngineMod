@@ -34,4 +34,17 @@ class MacroScriptParserTest {
         assertEquals("ASSIGN", statements.single().name)
         assertEquals(listOf("&value", "2 + 3 * 4"), statements.single().args)
     }
+
+    @Test
+    fun parsesStepBuilderRuntimeCommands() {
+        val script = "$" + "$" + "{\n" +
+            "WAITINVENTORYFULL();\n" +
+            "GOTO(10.00, 64.00, 20.00, 1.25, 15000, true);\n" +
+            "PAUSEMACRO(\"blocked\");\n" +
+            "}" + "$" + "$"
+
+        val statements = MacroScriptParser.parse(script)
+
+        assertEquals(listOf("WAITINVENTORYFULL", "GOTO", "PAUSEMACRO"), statements.map { it.name })
+    }
 }

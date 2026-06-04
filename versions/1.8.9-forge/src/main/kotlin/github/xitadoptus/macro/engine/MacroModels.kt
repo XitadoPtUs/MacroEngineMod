@@ -15,5 +15,6 @@ data class MacroEventBinding(
 
 data class MacroConfig(
     val macros: MutableList<MacroEntry> = mutableListOf(),
-    val events: MutableList<MacroEventBinding> = mutableListOf()
+    val events: MutableList<MacroEventBinding> = mutableListOf(),
+    var runtimeViewerKey: String = "V"
 )

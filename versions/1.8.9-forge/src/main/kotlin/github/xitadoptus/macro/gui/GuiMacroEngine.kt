@@ -23,6 +23,7 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
     private var nameField: GuiTextField? = null
     private var editor = TextArea()
     private var waitingForBind = false
+    private var waitingForRuntimeViewerBind = false
 
     override fun initGui() {
         MacroRuntime.ensureLoaded()
@@ -44,6 +45,7 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
         buttonList.add(GuiButton(2, left + listWidth + 16, buttonY, 62, 20, "Save"))
         buttonList.add(GuiButton(4, left + listWidth + 84, buttonY, 62, 20, "Run"))
         buttonList.add(GuiButton(5, left + listWidth + 152, buttonY, 72, 20, "Bind"))
+        buttonList.add(GuiButton(9, left + listWidth + 230, buttonY, 94, 20, "Viewer: ${MacroStorage.config.runtimeViewerKey}"))
         buttonList.add(GuiButton(0, right - 62, buttonY, 62, 20, "Back"))
 
         nameField = GuiTextField(0, mc.fontRendererObj, left + listWidth + 18, top + 46, right - left - listWidth - 36, 18)
@@ -86,7 +88,11 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
 
         if (mode == Mode.MACROS) {
             val currentKey = currentMacro()?.key ?: "NONE"
-            val keyText = if (waitingForBind) "Press a supported key..." else "Key: $currentKey"
+            val keyText = when {
+                waitingForBind -> "Press a supported key..."
+                waitingForRuntimeViewerBind -> "Runtime viewer: press a supported key..."
+                else -> "Key: $currentKey"
+            }
             mc.fontRendererObj.drawStringWithShadow(keyText, (right - 190).toFloat(), (top + 13).toFloat(), Color(190, 195, 205).rgb)
         }
 
@@ -163,6 +169,11 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
             return
         }
 
+        if (waitingForRuntimeViewerBind) {
+            bindRuntimeViewerKey(keyCode)
+            return
+        }
+
         if (keyCode == Keyboard.KEY_ESCAPE) {
             saveAndClose()
             return
@@ -215,10 +226,17 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
             }
             3 -> deleteEntry()
             4 -> runCurrent()
-            5 -> if (mode == Mode.MACROS) waitingForBind = true
+            5 -> if (mode == Mode.MACROS) {
+                waitingForBind = true
+                waitingForRuntimeViewerBind = false
+            }
             6 -> toggleEnabled()
             7 -> switchMode(Mode.MACROS)
             8 -> switchMode(Mode.EVENTS)
+            9 -> {
+                waitingForRuntimeViewerBind = true
+                waitingForBind = false
+            }
         }
         refreshButtons()
     }
@@ -237,6 +255,7 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
         selectedIndex = 0
         listScroll = 0
         waitingForBind = false
+        waitingForRuntimeViewerBind = false
         loadSelection()
     }
 
@@ -332,6 +351,24 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
         }
     }
 
+    private fun bindRuntimeViewerKey(keyCode: Int) {
+        waitingForRuntimeViewerBind = false
+        if (keyCode == Keyboard.KEY_ESCAPE || keyCode == Keyboard.KEY_BACK) {
+            MacroStorage.config.runtimeViewerKey = "V"
+            MacroRuntime.save()
+            return
+        }
+
+        val raw = Keyboard.getKeyName(keyCode) ?: "NONE"
+        val normalized = KeyboardUtils.normalizeKey(raw)
+        if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") {
+            MacroStorage.config.runtimeViewerKey = normalized
+            MacroRuntime.save()
+        } else {
+            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Unsupported runtime viewer key: \u00A7f$raw")
+        }
+    }
+
     private fun saveAndClose() {
         saveSelection()
         MacroRuntime.save()
@@ -340,6 +377,7 @@ class GuiMacroEngine(private val previousScreen: GuiScreen?) : GuiScreen() {
 
     private fun refreshButtons() {
         buttonList.firstOrNull { it.id == 5 }?.enabled = mode == Mode.MACROS && currentMacro() != null
+        buttonList.firstOrNull { it.id == 9 }?.displayString = if (waitingForRuntimeViewerBind) "Press key" else "Viewer: ${MacroStorage.config.runtimeViewerKey}"
         buttonList.firstOrNull { it.id == 4 }?.enabled = if (mode == Mode.MACROS) currentMacro() != null else currentEvent() != null
         buttonList.firstOrNull { it.id == 3 }?.enabled = itemLabels().isNotEmpty()
         buttonList.firstOrNull { it.id == 6 }?.displayString = if (currentEnabled()) "Enabled" else "Disabled"

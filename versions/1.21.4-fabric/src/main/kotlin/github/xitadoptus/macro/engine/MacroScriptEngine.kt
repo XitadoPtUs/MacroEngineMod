@@ -3,6 +3,9 @@ package github.xitadoptus.macro.engine
 import com.mojang.blaze3d.platform.InputConstants
 import github.xitadoptus.macro.MacroMod
 import github.xitadoptus.macro.gui.MacroScreen
+import github.xitadoptus.macro.recorder.builder.InventoryFullDetector
+import github.xitadoptus.macro.recorder.builder.RouteNavigator
+import github.xitadoptus.macro.recorder.builder.RouteWaypoint
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
 import github.xitadoptus.macro.util.MinecraftInstance
@@ -255,6 +258,9 @@ class MacroScriptEngine(
             "WAIT" -> sleepInterruptibly(parseWait(args.firstOrNull() ?: "1"))
             "WAITUNTIL" -> waitUntil(statement.args.getOrNull(0).orEmpty())
             "WAITWHILE" -> waitWhile(statement.args.getOrNull(0).orEmpty())
+            "WAITINVENTORYFULL" -> waitInventoryFull()
+            "GOTO" -> goTo(args)
+            "PAUSEMACRO" -> pauseMacro(args.firstOrNull() ?: "paused")
             "EXEC" -> execFile(args)
             "STOP" -> stopMacro(args.firstOrNull())
             "ASSIGN" -> assignVar(statement.args)
@@ -728,6 +734,40 @@ class MacroScriptEngine(
         }
         val locals = args.drop(2).mapIndexed { index, value -> index.toString() to value }.toMap()
         MacroScriptEngine("$taskId/$file", runningTasks, locals).execute(script)
+    }
+
+    private fun waitInventoryFull() {
+        var nextNoticeAt = 0L
+        while (!InventoryFullDetector.isClientInventoryFull(mc)) {
+            val now = System.currentTimeMillis()
+            if (now >= nextNoticeAt) {
+                ClientUtils.displayChatMessage("\u00A7e[MacroEngine] Waiting for inventory to be full.")
+                nextNoticeAt = now + 5000L
+            }
+            sleepInterruptibly(250L)
+        }
+    }
+
+    private fun goTo(args: List<String>) {
+        val waypoint = RouteWaypoint(
+            x = args.getOrNull(0)?.toDoubleOrNull() ?: return,
+            y = args.getOrNull(1)?.toDoubleOrNull() ?: return,
+            z = args.getOrNull(2)?.toDoubleOrNull() ?: return,
+            radius = args.getOrNull(3)?.toDoubleOrNull() ?: 1.25,
+            timeoutMillis = args.getOrNull(4)?.toLongOrNull() ?: 15000L,
+            sprint = args.getOrNull(5)?.toBooleanStrictOrNull() ?: true
+        )
+        val navigator = RouteNavigator(mc) { runningTasks.contains(taskId) }
+        if (!navigator.goTo(waypoint)) {
+            if (!runningTasks.contains(taskId)) throw StopMacro()
+            pauseMacro("route blocked")
+        }
+    }
+
+    private fun pauseMacro(reason: String) {
+        RouteNavigator(mc).releaseMovement()
+        ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Step builder paused: \u00A7f$reason")
+        throw StopMacro()
     }
 
     private fun key(bind: String?, down: Boolean? = null, pulse: Boolean = false) {

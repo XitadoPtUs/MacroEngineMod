@@ -3,11 +3,16 @@ package github.xitadoptus.macro
 import github.xitadoptus.macro.engine.MacroRuntime
 import github.xitadoptus.macro.gui.MacroScreen
 import github.xitadoptus.macro.recorder.MacroRecorder
+import github.xitadoptus.macro.recorder.builder.StepBuilderCaptureController
+import github.xitadoptus.macro.recorder.builder.StepBuilderPreviewState
+import github.xitadoptus.macro.recorder.builder.StepBuilderWorldPreview
+import github.xitadoptus.macro.update.UpdateChecker
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
 import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback
 import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.resources.ResourceLocation
@@ -31,14 +36,21 @@ object MacroMod : ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register { client ->
             MacroRuntime.onClientTick(client)
+            UpdateChecker.onClientTick(client)
             openPendingGui(client)
         }
 
         HudLayerRegistrationCallback.EVENT.register(HudLayerRegistrationCallback { layers ->
             layers.attachLayerAfter(IdentifiedLayer.SUBTITLES, ResourceLocation.fromNamespaceAndPath(MOD_ID, "recorder_overlay")) { graphics, _ ->
                 MacroRecorder.renderOverlay(graphics)
+                StepBuilderCaptureController.renderOverlay(graphics)
             }
         })
+
+        WorldRenderEvents.AFTER_ENTITIES.register { context ->
+            StepBuilderWorldPreview.render(context, StepBuilderPreviewState.snapshot())
+            StepBuilderCaptureController.renderWorld(context)
+        }
 
         ClientReceiveMessageEvents.CHAT.register { message, _, _, _, _ ->
             MacroRuntime.onChat(message.string)

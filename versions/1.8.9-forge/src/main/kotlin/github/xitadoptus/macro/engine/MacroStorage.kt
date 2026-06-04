@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import github.xitadoptus.macro.MacroMod
 import github.xitadoptus.macro.util.ClientUtils
+import github.xitadoptus.macro.util.KeyboardUtils
 import java.io.File
 
 object MacroStorage {
@@ -32,6 +33,7 @@ object MacroStorage {
             config = gson.fromJson(json, MacroConfig::class.java) ?: MacroConfig()
             config.macros.removeAll { it.name.isBlank() }
             config.events.removeAll { it.event.isBlank() }
+            config.runtimeViewerKey = normalizeRuntimeViewerKey(config.runtimeViewerKey)
         }.onFailure {
             ClientUtils.logError("[MacroEngine] Failed to load macros.json", it)
             config = MacroConfig()
@@ -68,5 +70,10 @@ object MacroStorage {
             val safeName = macro.name.replace(Regex("[^A-Za-z0-9_. -]"), "_").ifBlank { "macro" }
             scriptFile(safeName).writeText(macro.script, Charsets.UTF_8)
         }
+    }
+
+    private fun normalizeRuntimeViewerKey(raw: String?): String {
+        val normalized = KeyboardUtils.normalizeKey(raw.orEmpty())
+        return if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") normalized else "V"
     }
 }

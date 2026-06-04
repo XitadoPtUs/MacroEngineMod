@@ -6,8 +6,10 @@ import github.xitadoptus.macro.engine.MacroEventBinding
 import github.xitadoptus.macro.engine.MacroRuntime
 import github.xitadoptus.macro.engine.MacroStorage
 import github.xitadoptus.macro.recorder.MacroRecorder
+import github.xitadoptus.macro.recorder.builder.StepBuilderCaptureController
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
+import net.minecraft.ChatFormatting
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.EditBox
@@ -26,9 +28,14 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     private var editor = TextEditor()
     private var waitingForBind = false
     private var waitingForRecorderStopBind = false
+    private var waitingForMacroStopBind = false
+    private var waitingForRuntimeViewerBind = false
     private var bindButton: Button? = null
     private var recorderButton: Button? = null
     private var recorderStopButton: Button? = null
+    private var macroStopButton: Button? = null
+    private var runtimeViewerButton: Button? = null
+    private var builderButton: Button? = null
     private var runButton: Button? = null
     private var deleteButton: Button? = null
     private var enabledButton: Button? = null
@@ -45,6 +52,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         val bottom = height - 18
         val listWidth = 170
         val buttonY = bottom - 22
+        val builderY = buttonY - 24
 
         addButton(7, left, top - 4, 78, 20, "Macros")
         addButton(8, left + 84, top - 4, 78, 20, "Events")
@@ -56,6 +64,9 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         bindButton = addButton(5, left + listWidth + 152, buttonY, 72, 20, "Bind")
         recorderButton = addButton(9, left + listWidth + 230, buttonY, 104, 20, "Start Recorder")
         recorderStopButton = addButton(10, left + listWidth + 340, buttonY, 104, 20, "Stop: ${MacroStorage.config.recorderStopKey}")
+        builderButton = addButton(11, left + listWidth + 16, builderY, 124, 20, builderButtonText())
+        macroStopButton = addButton(12, left + listWidth + 142, builderY, 112, 20, "Macro Stop: ${MacroStorage.config.macroStopKey}")
+        runtimeViewerButton = addButton(13, left + listWidth + 260, builderY, 112, 20, "Viewer: ${MacroStorage.config.runtimeViewerKey}")
         addButton(0, right - 62, buttonY, 62, 20, "Back")
 
         nameField = EditBox(font, left + listWidth + 18, top + 46, right - left - listWidth - 36, 18, Component.literal("")).also {
@@ -65,7 +76,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             renderedWidgets += it
         }
 
-        editor.setBounds(left + listWidth + 18, top + 76, right - left - listWidth - 36, bottom - top - 112)
+        editor.setBounds(left + listWidth + 18, top + 76, right - left - listWidth - 36, bottom - top - 136)
         loadSelection()
         refreshButtons()
     }
@@ -96,6 +107,8 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             val keyText = when {
                 waitingForBind -> "Press a supported key..."
                 waitingForRecorderStopBind -> "Recorder stop: press a supported key..."
+                waitingForMacroStopBind -> "Macro stop: press a supported key..."
+                waitingForRuntimeViewerBind -> "Runtime viewer: press a supported key..."
                 else -> "Key: $currentKey"
             }
             val keyComponent = MacroFonts.text(keyText)
@@ -151,6 +164,16 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        if (waitingForMacroStopBind) {
+            bindMacroStopKey(keyCode)
+            return true
+        }
+
+        if (waitingForRuntimeViewerBind) {
+            bindRuntimeViewerKey(keyCode)
+            return true
+        }
+
         if (waitingForRecorderStopBind) {
             bindRecorderStopKey(keyCode)
             return true
@@ -196,8 +219,12 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     override fun isPauseScreen(): Boolean = false
 
     private fun addButton(id: Int, x: Int, y: Int, w: Int, h: Int, text: String): Button {
+        return addButton(id, x, y, w, h, MacroFonts.text(text))
+    }
+
+    private fun addButton(id: Int, x: Int, y: Int, w: Int, h: Int, text: Component): Button {
         val button = addRenderableWidget(
-            Button.builder(MacroFonts.text(text)) {
+            Button.builder(text) {
                 handleButton(id)
             }.bounds(x, y, w, h).build()
         )
@@ -216,7 +243,12 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             }
             3 -> deleteEntry()
             4 -> runCurrent()
-            5 -> if (mode == Mode.MACROS) waitingForBind = true
+            5 -> if (mode == Mode.MACROS) {
+                waitingForBind = true
+                waitingForRecorderStopBind = false
+                waitingForMacroStopBind = false
+                waitingForRuntimeViewerBind = false
+            }
             6 -> toggleEnabled()
             7 -> switchMode(Mode.MACROS)
             8 -> switchMode(Mode.EVENTS)
@@ -224,6 +256,21 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             10 -> {
                 waitingForRecorderStopBind = true
                 waitingForBind = false
+                waitingForMacroStopBind = false
+                waitingForRuntimeViewerBind = false
+            }
+            11 -> startBuilder()
+            12 -> {
+                waitingForMacroStopBind = true
+                waitingForBind = false
+                waitingForRecorderStopBind = false
+                waitingForRuntimeViewerBind = false
+            }
+            13 -> {
+                waitingForRuntimeViewerBind = true
+                waitingForBind = false
+                waitingForRecorderStopBind = false
+                waitingForMacroStopBind = false
             }
         }
         refreshButtons()
@@ -268,6 +315,8 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         listScroll = 0
         waitingForBind = false
         waitingForRecorderStopBind = false
+        waitingForMacroStopBind = false
+        waitingForRuntimeViewerBind = false
         loadSelection()
     }
 
@@ -295,12 +344,28 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     }
 
     private fun toggleEnabled() {
-        if (mode == Mode.MACROS) currentMacro()?.let { it.enabled = !it.enabled } else currentEvent()?.let { it.enabled = !it.enabled }
+        if (mode == Mode.MACROS) {
+            currentMacro()?.let {
+                it.enabled = !it.enabled
+                if (!it.enabled && MacroRuntime.stopMatching(it.name)) {
+                    ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Macro disabled and stopped.")
+                }
+            }
+        } else {
+            currentEvent()?.let { it.enabled = !it.enabled }
+        }
     }
 
     private fun runCurrent() {
         saveSelection()
-        if (mode == Mode.MACROS) currentMacro()?.let { MacroRuntime.runMacro(it) } else currentEvent()?.let { MacroRuntime.runScript(it.script, it.event) }
+        if (mode == Mode.MACROS) {
+            currentMacro()?.let {
+                MacroRuntime.runMacro(it)
+                if (it.builder != null) minecraft!!.setScreen(null)
+            }
+        } else {
+            currentEvent()?.let { MacroRuntime.runScript(it.script, it.event) }
+        }
     }
 
     private fun saveSelection() {
@@ -370,10 +435,54 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         }
     }
 
+    private fun bindMacroStopKey(keyCode: Int) {
+        waitingForMacroStopBind = false
+        if (keyCode == InputConstants.KEY_ESCAPE || keyCode == InputConstants.KEY_BACKSPACE) {
+            MacroStorage.config.macroStopKey = "END"
+            MacroRuntime.save()
+            return
+        }
+
+        val normalized = KeyboardUtils.normalizeKey(KeyboardUtils.keyNameFromCode(keyCode))
+        if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") {
+            MacroStorage.config.macroStopKey = normalized
+            MacroRuntime.save()
+        } else {
+            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Unsupported macro stop key: \u00A7f$normalized")
+        }
+    }
+
+    private fun bindRuntimeViewerKey(keyCode: Int) {
+        waitingForRuntimeViewerBind = false
+        if (keyCode == InputConstants.KEY_ESCAPE || keyCode == InputConstants.KEY_BACKSPACE) {
+            MacroStorage.config.runtimeViewerKey = "V"
+            MacroRuntime.save()
+            return
+        }
+
+        val normalized = KeyboardUtils.normalizeKey(KeyboardUtils.keyNameFromCode(keyCode))
+        if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") {
+            MacroStorage.config.runtimeViewerKey = normalized
+            MacroRuntime.save()
+        } else {
+            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Unsupported runtime viewer key: \u00A7f$normalized")
+        }
+    }
+
     private fun startRecorder() {
         saveSelection()
         MacroRuntime.save()
         if (MacroRecorder.start(MacroStorage.config.recorderStopKey)) {
+            minecraft!!.setScreen(null)
+        }
+    }
+
+    private fun startBuilder() {
+        saveSelection()
+        MacroRuntime.save()
+        val name = nameField?.value?.takeIf { it.isNotBlank() } ?: "Step Builder ${MacroStorage.config.macros.size + 1}"
+        val command = editor.text.lineSequence().firstOrNull { it.trim().startsWith("/") }?.trim() ?: "/vip"
+        if (StepBuilderCaptureController.start(name, command)) {
             minecraft!!.setScreen(null)
         }
     }
@@ -387,7 +496,11 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     private fun refreshButtons() {
         bindButton?.active = mode == Mode.MACROS && currentMacro() != null
         recorderButton?.active = !MacroRecorder.active
+        builderButton?.active = mode == Mode.MACROS
+        builderButton?.message = builderButtonText()
         recorderStopButton?.message = MacroFonts.text(if (waitingForRecorderStopBind) "Press key" else "Stop: ${MacroStorage.config.recorderStopKey}")
+        macroStopButton?.message = MacroFonts.text(if (waitingForMacroStopBind) "Press key" else "Macro Stop: ${MacroStorage.config.macroStopKey}")
+        runtimeViewerButton?.message = MacroFonts.text(if (waitingForRuntimeViewerBind) "Press key" else "Viewer: ${MacroStorage.config.runtimeViewerKey}")
         runButton?.active = if (mode == Mode.MACROS) currentMacro() != null else currentEvent() != null
         deleteButton?.active = itemLabels().isNotEmpty()
         enabledButton?.message = MacroFonts.text(if (currentEnabled()) "Enabled" else "Disabled")
@@ -410,5 +523,11 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
 
     private fun trim(text: String, max: Int): String {
         return if (text.length <= max) text else text.take(max - 3) + "..."
+    }
+
+    private fun builderButtonText(): Component {
+        return Component.literal("")
+            .append(MacroFonts.text("Start Builder "))
+            .append(Component.literal("[BETA]").setStyle(MacroFonts.STYLE.withColor(ChatFormatting.RED)))
     }
 }
