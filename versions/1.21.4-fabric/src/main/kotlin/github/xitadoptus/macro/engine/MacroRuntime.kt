@@ -2,7 +2,7 @@ package github.xitadoptus.macro.engine
 
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
-import github.xitadoptus.macro.gui.MacroRuntimeViewerScreen
+import github.xitadoptus.macro.gui.MacroRuntimeViewerOverlay
 import github.xitadoptus.macro.recorder.MacroRecorder
 import github.xitadoptus.macro.recorder.builder.StepBuilderCaptureController
 import github.xitadoptus.macro.recorder.builder.RouteNavigator
@@ -40,9 +40,6 @@ object MacroRuntime {
 
     @Volatile
     private var lastWorldPresent = false
-
-    @Volatile
-    private var macroStopWasPressed = false
 
     @Volatile
     private var runtimeViewerWasPressed = false
@@ -120,6 +117,22 @@ object MacroRuntime {
         return stopped
     }
 
+    fun stopMacro(name: String): Boolean {
+        if (name.isBlank()) return false
+        val ids = running.filter { id ->
+            val label = runningLabels[id] ?: id.substringBeforeLast("-")
+            label.equals(name, ignoreCase = true)
+        }
+        if (ids.isEmpty()) return false
+        ids.forEach { id ->
+            running.remove(id)
+            runningLabels.remove(id)
+            StepBuilderPreviewState.unregister(id)
+        }
+        releaseHeldInputs(Minecraft.getInstance())
+        return true
+    }
+
     fun stopAll(showMessage: Boolean = true): Boolean {
         val stopped = running.isNotEmpty()
         if (!stopped) return false
@@ -144,14 +157,13 @@ object MacroRuntime {
         updateWorldState(client)
         if (client.level == null || client.player == null) {
             previousKeyState.clear()
-            macroStopWasPressed = false
             runtimeViewerWasPressed = false
             return
         }
-        if (handleMacroStopKey(client)) return
         if (MacroRecorder.onClientTick(client)) return
         if (StepBuilderCaptureController.onClientTick(client)) return
         handleRuntimeViewerKey(client)
+        MacroRuntimeViewerOverlay.onClientTick(client)
         if (client.screen != null) return
 
         MacroStorage.config.macros
@@ -161,33 +173,31 @@ object MacroRuntime {
                 val pressed = KeyboardUtils.isInputPressed(key)
                 val before = previousKeyState.put(key, pressed) ?: false
                 if (pressed && !before) {
-                    runMacro(
-                        macro,
-                        locals = mapOf(
-                            "KEYNAME" to key,
-                            "KEYID" to KeyboardUtils.keyCode(key).toString()
-                        )
-                    )
+                    toggleMacro(macro, key)
                 }
             }
     }
 
-    private fun handleMacroStopKey(client: Minecraft): Boolean {
-        val stopKey = KeyboardUtils.normalizeKey(MacroStorage.config.macroStopKey)
-        if (!KeyboardUtils.isValidKeyName(stopKey) || stopKey == "NONE") return false
-        val pressed = KeyboardUtils.isInputPressed(stopKey)
-        val stopped = pressed && !macroStopWasPressed && stopAll()
-        macroStopWasPressed = pressed
-        if (stopped) releaseHeldInputs(client)
-        return stopped || (pressed && running.isNotEmpty())
+    private fun toggleMacro(macro: MacroEntry, key: String) {
+        if (stopMacro(macro.name)) {
+            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Macro stopped: \u00A7f${macro.name}")
+            return
+        }
+        runMacro(
+            macro,
+            locals = mapOf(
+                "KEYNAME" to key,
+                "KEYID" to KeyboardUtils.keyCode(key).toString()
+            )
+        )
     }
 
     private fun handleRuntimeViewerKey(client: Minecraft) {
         val viewerKey = KeyboardUtils.normalizeKey(MacroStorage.config.runtimeViewerKey)
         if (!KeyboardUtils.isValidKeyName(viewerKey) || viewerKey == "NONE") return
         val pressed = KeyboardUtils.isInputPressed(viewerKey)
-        if (pressed && !runtimeViewerWasPressed && client.screen == null) {
-            client.setScreen(MacroRuntimeViewerScreen())
+        if (pressed && !runtimeViewerWasPressed) {
+            MacroRuntimeViewerOverlay.toggle(client)
         }
         runtimeViewerWasPressed = pressed
     }

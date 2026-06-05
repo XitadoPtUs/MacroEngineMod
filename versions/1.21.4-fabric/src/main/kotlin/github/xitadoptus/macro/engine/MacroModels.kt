@@ -20,6 +20,5 @@ data class MacroConfig(
     val macros: MutableList<MacroEntry> = mutableListOf(),
     val events: MutableList<MacroEventBinding> = mutableListOf(),
     var recorderStopKey: String = "RSHIFT",
-    var macroStopKey: String = "END",
     var runtimeViewerKey: String = "V"
 )

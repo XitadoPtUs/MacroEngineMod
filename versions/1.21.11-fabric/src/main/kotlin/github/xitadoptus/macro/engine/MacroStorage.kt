@@ -33,7 +33,6 @@ object MacroStorage {
             config.macros.removeAll { it.name.isBlank() }
             config.events.removeAll { it.event.isBlank() }
             config.recorderStopKey = normalizeRecorderStopKey(config.recorderStopKey)
-            config.macroStopKey = normalizeMacroStopKey(config.macroStopKey)
             config.runtimeViewerKey = normalizeRuntimeViewerKey(config.runtimeViewerKey)
         }.onFailure {
             ClientUtils.logError("[MacroEngine] Failed to load macros.json", it)
@@ -76,11 +75,6 @@ object MacroStorage {
     private fun normalizeRecorderStopKey(raw: String?): String {
         val normalized = KeyboardUtils.normalizeKey(raw.orEmpty())
         return if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") normalized else "RSHIFT"
-    }
-
-    private fun normalizeMacroStopKey(raw: String?): String {
-        val normalized = KeyboardUtils.normalizeKey(raw.orEmpty())
-        return if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") normalized else "END"
     }
 
     private fun normalizeRuntimeViewerKey(raw: String?): String {

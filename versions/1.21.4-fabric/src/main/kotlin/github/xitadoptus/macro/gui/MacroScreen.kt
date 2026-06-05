@@ -28,12 +28,10 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     private var editor = TextEditor()
     private var waitingForBind = false
     private var waitingForRecorderStopBind = false
-    private var waitingForMacroStopBind = false
     private var waitingForRuntimeViewerBind = false
     private var bindButton: Button? = null
     private var recorderButton: Button? = null
     private var recorderStopButton: Button? = null
-    private var macroStopButton: Button? = null
     private var runtimeViewerButton: Button? = null
     private var builderButton: Button? = null
     private var runButton: Button? = null
@@ -65,8 +63,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         recorderButton = addButton(9, left + listWidth + 230, buttonY, 104, 20, "Start Recorder")
         recorderStopButton = addButton(10, left + listWidth + 340, buttonY, 104, 20, "Stop: ${MacroStorage.config.recorderStopKey}")
         builderButton = addButton(11, left + listWidth + 16, builderY, 124, 20, builderButtonText())
-        macroStopButton = addButton(12, left + listWidth + 142, builderY, 112, 20, "Macro Stop: ${MacroStorage.config.macroStopKey}")
-        runtimeViewerButton = addButton(13, left + listWidth + 260, builderY, 112, 20, "Viewer: ${MacroStorage.config.runtimeViewerKey}")
+        runtimeViewerButton = addButton(13, left + listWidth + 146, builderY, 112, 20, "Viewer: ${MacroStorage.config.runtimeViewerKey}")
         addButton(0, right - 62, buttonY, 62, 20, "Back")
 
         nameField = EditBox(font, left + listWidth + 18, top + 46, right - left - listWidth - 36, 18, Component.literal("")).also {
@@ -107,7 +104,6 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             val keyText = when {
                 waitingForBind -> "Press a supported key..."
                 waitingForRecorderStopBind -> "Recorder stop: press a supported key..."
-                waitingForMacroStopBind -> "Macro stop: press a supported key..."
                 waitingForRuntimeViewerBind -> "Runtime viewer: press a supported key..."
                 else -> "Key: $currentKey"
             }
@@ -164,11 +160,6 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
-        if (waitingForMacroStopBind) {
-            bindMacroStopKey(keyCode)
-            return true
-        }
-
         if (waitingForRuntimeViewerBind) {
             bindRuntimeViewerKey(keyCode)
             return true
@@ -246,7 +237,6 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             5 -> if (mode == Mode.MACROS) {
                 waitingForBind = true
                 waitingForRecorderStopBind = false
-                waitingForMacroStopBind = false
                 waitingForRuntimeViewerBind = false
             }
             6 -> toggleEnabled()
@@ -256,21 +246,13 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             10 -> {
                 waitingForRecorderStopBind = true
                 waitingForBind = false
-                waitingForMacroStopBind = false
                 waitingForRuntimeViewerBind = false
             }
             11 -> startBuilder()
-            12 -> {
-                waitingForMacroStopBind = true
-                waitingForBind = false
-                waitingForRecorderStopBind = false
-                waitingForRuntimeViewerBind = false
-            }
             13 -> {
                 waitingForRuntimeViewerBind = true
                 waitingForBind = false
                 waitingForRecorderStopBind = false
-                waitingForMacroStopBind = false
             }
         }
         refreshButtons()
@@ -315,7 +297,6 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         listScroll = 0
         waitingForBind = false
         waitingForRecorderStopBind = false
-        waitingForMacroStopBind = false
         waitingForRuntimeViewerBind = false
         loadSelection()
     }
@@ -435,23 +416,6 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         }
     }
 
-    private fun bindMacroStopKey(keyCode: Int) {
-        waitingForMacroStopBind = false
-        if (keyCode == InputConstants.KEY_ESCAPE || keyCode == InputConstants.KEY_BACKSPACE) {
-            MacroStorage.config.macroStopKey = "END"
-            MacroRuntime.save()
-            return
-        }
-
-        val normalized = KeyboardUtils.normalizeKey(KeyboardUtils.keyNameFromCode(keyCode))
-        if (KeyboardUtils.isValidKeyName(normalized) && normalized != "NONE") {
-            MacroStorage.config.macroStopKey = normalized
-            MacroRuntime.save()
-        } else {
-            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Unsupported macro stop key: \u00A7f$normalized")
-        }
-    }
-
     private fun bindRuntimeViewerKey(keyCode: Int) {
         waitingForRuntimeViewerBind = false
         if (keyCode == InputConstants.KEY_ESCAPE || keyCode == InputConstants.KEY_BACKSPACE) {
@@ -499,7 +463,6 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         builderButton?.active = mode == Mode.MACROS
         builderButton?.message = builderButtonText()
         recorderStopButton?.message = MacroFonts.text(if (waitingForRecorderStopBind) "Press key" else "Stop: ${MacroStorage.config.recorderStopKey}")
-        macroStopButton?.message = MacroFonts.text(if (waitingForMacroStopBind) "Press key" else "Macro Stop: ${MacroStorage.config.macroStopKey}")
         runtimeViewerButton?.message = MacroFonts.text(if (waitingForRuntimeViewerBind) "Press key" else "Viewer: ${MacroStorage.config.runtimeViewerKey}")
         runButton?.active = if (mode == Mode.MACROS) currentMacro() != null else currentEvent() != null
         deleteButton?.active = itemLabels().isNotEmpty()

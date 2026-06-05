@@ -3,11 +3,13 @@ package github.xitadoptus.macro.engine
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
 import github.xitadoptus.macro.util.MinecraftInstance
+import github.xitadoptus.macro.gui.GuiMacroEngine
 import net.minecraft.block.Block
 import net.minecraft.client.Minecraft
 import net.minecraft.client.audio.SoundCategory
 import net.minecraft.client.gui.GuiChat
 import net.minecraft.client.gui.inventory.GuiContainer
+import net.minecraft.client.gui.inventory.GuiInventory
 import net.minecraft.client.settings.GameSettings
 import net.minecraft.client.settings.KeyBinding
 import net.minecraft.entity.player.EntityPlayer
@@ -1198,7 +1200,7 @@ class MacroScriptEngine(
     private fun getSlotItem(rawArgs: List<String>, args: List<String>) {
         val slot = args.firstOrNull()?.toIntOrNull() ?: return
         val stack = mc.thePlayer?.inventory?.mainInventory?.getOrNull(slot)
-        setVar(rawArgs.getOrNull(1), stack?.let { Item.getIdFromItem(it.item).toString() } ?: "0")
+        setVar(rawArgs.getOrNull(1), stack?.let { Item.getIdFromItem(it.item).toString() } ?: "air")
         setVar(rawArgs.getOrNull(2), stack?.stackSize?.toString() ?: "0")
         setVar(rawArgs.getOrNull(3), stack?.itemDamage?.toString() ?: "0")
     }
@@ -1515,8 +1517,14 @@ class MacroScriptEngine(
     }
 
     private fun gui(name: String?) {
-        if (name == null || name.equals("chat", true)) {
-            schedule { mc.displayGuiScreen(GuiChat()) }
+        when (name?.trim()?.toLowerCase(Locale.ROOT).orEmpty()) {
+            "", "close", "game", "none" -> schedule { mc.displayGuiScreen(null) }
+            "chat" -> schedule { mc.displayGuiScreen(GuiChat()) }
+            "inventory", "inv" -> schedule {
+                val player = mc.thePlayer ?: return@schedule
+                mc.displayGuiScreen(GuiInventory(player))
+            }
+            "macro", "macros", "macroengine" -> schedule { mc.displayGuiScreen(GuiMacroEngine(mc.currentScreen)) }
         }
     }
 

@@ -4,6 +4,7 @@ import github.xitadoptus.macro.gui.GuiMacroRuntimeViewer
 import github.xitadoptus.macro.util.ClientUtils
 import github.xitadoptus.macro.util.KeyboardUtils
 import github.xitadoptus.macro.util.MinecraftInstance
+import net.minecraft.client.settings.KeyBinding
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
@@ -102,8 +103,24 @@ object MacroRuntime : MinecraftInstance() {
         val stopped = running.size != before
         if (stopped) {
             runningLabels.entries.removeIf { it.value.contains(name, ignoreCase = true) }
+            releaseHeldInputs()
         }
         return stopped
+    }
+
+    fun stopMacro(name: String): Boolean {
+        if (name.isBlank()) return false
+        val ids = running.filter { id ->
+            val label = runningLabels[id] ?: id.substringBeforeLast("-")
+            label.equals(name, ignoreCase = true)
+        }
+        if (ids.isEmpty()) return false
+        ids.forEach { id ->
+            running.remove(id)
+            runningLabels.remove(id)
+        }
+        releaseHeldInputs()
+        return true
     }
 
     fun fireEvent(event: String, locals: Map<String, String> = emptyMap()) {
@@ -124,6 +141,7 @@ object MacroRuntime : MinecraftInstance() {
             return
         }
         handleRuntimeViewerKey()
+        GuiMacroRuntimeViewer.onClientTick()
         if (mc.currentScreen != null) return
 
         MacroStorage.config.macros
@@ -133,13 +151,7 @@ object MacroRuntime : MinecraftInstance() {
                 val pressed = KeyboardUtils.isKeyPressed(key)
                 val before = previousKeyState.put(key, pressed) ?: false
                 if (pressed && !before) {
-                    runMacro(
-                        macro,
-                        locals = mapOf(
-                            "KEYNAME" to key,
-                            "KEYID" to KeyboardUtils.keyCode(key).toString()
-                        )
-                    )
+                    toggleMacro(macro, key)
                 }
             }
     }
@@ -166,9 +178,39 @@ object MacroRuntime : MinecraftInstance() {
         val viewerKey = KeyboardUtils.normalizeKey(MacroStorage.config.runtimeViewerKey)
         if (!KeyboardUtils.isValidKeyName(viewerKey) || viewerKey == "NONE") return
         val pressed = KeyboardUtils.isInputPressed(viewerKey)
-        if (pressed && !runtimeViewerWasPressed && mc.currentScreen == null) {
-            mc.displayGuiScreen(GuiMacroRuntimeViewer())
+        if (pressed && !runtimeViewerWasPressed) {
+            GuiMacroRuntimeViewer.toggle()
         }
         runtimeViewerWasPressed = pressed
+    }
+
+    private fun toggleMacro(macro: MacroEntry, key: String) {
+        if (stopMacro(macro.name)) {
+            ClientUtils.displayChatMessage("Â§c[MacroEngine] Macro stopped: Â§f${macro.name}")
+            return
+        }
+        runMacro(
+            macro,
+            locals = mapOf(
+                "KEYNAME" to key,
+                "KEYID" to KeyboardUtils.keyCode(key).toString()
+            )
+        )
+    }
+
+    private fun releaseHeldInputs() {
+        val settings = mc.gameSettings ?: return
+        listOf(
+            settings.keyBindForward,
+            settings.keyBindBack,
+            settings.keyBindLeft,
+            settings.keyBindRight,
+            settings.keyBindJump,
+            settings.keyBindSneak,
+            settings.keyBindSprint,
+            settings.keyBindAttack,
+            settings.keyBindUseItem
+        ).forEach { KeyBinding.setKeyBindState(it.keyCode, false) }
+        mc.thePlayer?.isSprinting = false
     }
 }

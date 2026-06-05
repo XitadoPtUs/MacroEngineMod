@@ -1,6 +1,7 @@
 package github.xitadoptus.macro
 
 import github.xitadoptus.macro.engine.MacroRuntime
+import github.xitadoptus.macro.gui.MacroRuntimeViewerOverlay
 import github.xitadoptus.macro.gui.MacroScreen
 import github.xitadoptus.macro.recorder.MacroRecorder
 import github.xitadoptus.macro.recorder.builder.StepBuilderCaptureController
@@ -13,6 +14,8 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents
+import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.resources.Identifier
@@ -43,6 +46,16 @@ object MacroMod : ClientModInitializer {
         HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, Identifier.fromNamespaceAndPath(MOD_ID, "recorder_overlay")) { graphics, _ ->
             MacroRecorder.renderOverlay(graphics)
             StepBuilderCaptureController.renderOverlay(graphics)
+            MacroRuntimeViewerOverlay.renderHud(graphics)
+        }
+
+        ScreenEvents.AFTER_INIT.register { client, screen, _, _ ->
+            ScreenEvents.afterRender(screen).register { _, graphics, mouseX, mouseY, _ ->
+                MacroRuntimeViewerOverlay.renderScreen(graphics, client.font, mouseX, mouseY)
+            }
+            ScreenMouseEvents.allowMouseClick(screen).register { _, context ->
+                context.button() != 0 || !MacroRuntimeViewerOverlay.mouseClicked(context.x().toInt(), context.y().toInt())
+            }
         }
 
         WorldRenderEvents.AFTER_ENTITIES.register { context ->

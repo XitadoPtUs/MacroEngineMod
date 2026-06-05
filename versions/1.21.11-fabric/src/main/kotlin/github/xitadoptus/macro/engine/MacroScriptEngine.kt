@@ -13,6 +13,7 @@ import net.minecraft.client.CameraType
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
@@ -424,7 +425,15 @@ class MacroScriptEngine(
             }
         }
 
-        return if (quoted) expr.isNotEmpty() else truthy(evalValue(expr))
+        return if (quoted) expr.isNotEmpty() else truthy(evalConditionValue(expr))
+    }
+
+    private fun evalConditionValue(expr: String): String {
+        val value = expr.trim()
+        if (value.equals("true", ignoreCase = true) || value.equals("false", ignoreCase = true)) return value
+        if (value.toDoubleOrNull() != null) return value
+        if (isVariableRef(value) || isBareIdentifier(value)) return resolveVariable(value)
+        return evalValue(value)
     }
 
     private fun replaceVars(text: String): String {
@@ -843,7 +852,7 @@ class MacroScriptEngine(
     private fun getSlotItem(rawArgs: List<String>, args: List<String>) {
         val slot = args.firstOrNull()?.toIntOrNull() ?: return
         val stack = mc.player?.inventory?.getNonEquipmentItems()?.getOrNull(slot) ?: ItemStack.EMPTY
-        setVar(rawArgs.getOrNull(1), if (stack.isEmpty) "0" else BuiltInRegistries.ITEM.getId(stack.item).toString())
+        setVar(rawArgs.getOrNull(1), if (stack.isEmpty) "air" else BuiltInRegistries.ITEM.getId(stack.item).toString())
         setVar(rawArgs.getOrNull(2), if (stack.isEmpty) "0" else stack.count.toString())
         setVar(rawArgs.getOrNull(3), if (stack.isEmpty) "0" else stack.damageValue.toString())
     }
@@ -1051,8 +1060,14 @@ class MacroScriptEngine(
     }
 
     private fun gui(name: String?) {
-        if (name.isNullOrBlank() || name.equals("macro", ignoreCase = true) || name.equals("macros", ignoreCase = true)) {
-            schedule { mc.setScreen(MacroScreen(mc.screen)) }
+        when (name?.trim()?.lowercase(Locale.ROOT).orEmpty()) {
+            "", "close", "game", "none" -> schedule { mc.setScreen(null) }
+            "macro", "macros", "macroengine" -> schedule { mc.setScreen(MacroScreen(mc.screen)) }
+            "inventory", "inv" -> schedule {
+                val player = mc.player ?: return@schedule
+                mc.setScreen(InventoryScreen(player))
+            }
+            "chat" -> schedule { mc.setScreen(ChatScreen("", false)) }
         }
     }
 
@@ -1392,6 +1407,11 @@ class MacroScriptEngine(
     private fun isVariableRef(raw: String): Boolean {
         val text = raw.trim()
         return text.startsWith("&") || text.startsWith("#") || text.startsWith("@") || (text.startsWith("%") && text.endsWith("%"))
+    }
+
+    private fun isBareIdentifier(raw: String): Boolean {
+        val text = raw.trim()
+        return text.isNotEmpty() && text.first().let { it == '_' || it.isLetter() } && text.drop(1).all { it == '_' || it.isLetterOrDigit() }
     }
 
     private fun iteratorRows(rawIterator: String): List<Map<String, String>> {

@@ -2,6 +2,7 @@ package github.xitadoptus.macro
 
 import github.xitadoptus.macro.engine.MacroRuntime
 import github.xitadoptus.macro.gui.GuiMacroEngine
+import github.xitadoptus.macro.gui.GuiMacroRuntimeViewer
 import github.xitadoptus.macro.update.UpdateChecker
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiChat
@@ -29,6 +30,7 @@ class MacroMod {
         if (!configDir.exists()) configDir.mkdirs()
         MacroRuntime.ensureLoaded()
         MinecraftForge.EVENT_BUS.register(MacroRuntime)
+        MinecraftForge.EVENT_BUS.register(GuiMacroRuntimeViewer)
         FMLCommonHandler.instance().bus().register(MacroRuntime)
         FMLCommonHandler.instance().bus().register(this)
         ClientCommandHandler.instance.registerCommand(MacroCommand())

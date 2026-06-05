@@ -1,33 +1,56 @@
 package github.xitadoptus.macro.gui
 
 import github.xitadoptus.macro.engine.MacroRuntime
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.screens.ChatScreen
-import net.minecraft.client.input.MouseButtonEvent
+import org.lwjgl.glfw.GLFW
 import java.awt.Color
-
-class MacroRuntimeViewerScreen : ChatScreen("", false) {
-    override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
-        super.render(graphics, mouseX, mouseY, partialTick)
-        MacroRuntimeViewerOverlay.render(graphics, font, mouseX, mouseY)
-    }
-
-    override fun mouseClicked(mouseButtonEvent: MouseButtonEvent, doubleClick: Boolean): Boolean {
-        val mouseX = mouseButtonEvent.x()
-        val mouseY = mouseButtonEvent.y()
-        val button = mouseButtonEvent.button()
-        if (button == 0 && MacroRuntimeViewerOverlay.mouseClicked(mouseX.toInt(), mouseY.toInt())) return true
-        return super.mouseClicked(mouseButtonEvent, doubleClick)
-    }
-}
 
 object MacroRuntimeViewerOverlay {
     private data class StopHitbox(val macroName: String, val x: Int, val y: Int, val width: Int, val height: Int)
 
     private val hitboxes = mutableListOf<StopHitbox>()
 
-    fun render(graphics: GuiGraphics, font: Font, mouseX: Int, mouseY: Int) {
+    @Volatile
+    private var active = false
+
+    fun isActive(): Boolean = active
+
+    fun toggle(client: Minecraft) {
+        if (active) close(client) else open(client)
+    }
+
+    fun onClientTick(client: Minecraft) {
+        if (!active) return
+        if (client.screen != null) return
+        client.mouseHandler.releaseMouse()
+    }
+
+    fun renderHud(graphics: GuiGraphics) {
+        if (!active) return
+        val client = Minecraft.getInstance()
+        if (client.screen != null) return
+        val mouse = scaledMouse(client)
+        render(graphics, client.font, mouse.first, mouse.second)
+    }
+
+    fun renderScreen(graphics: GuiGraphics, font: Font, mouseX: Int, mouseY: Int) {
+        if (active) render(graphics, font, mouseX, mouseY)
+    }
+
+    private fun open(client: Minecraft) {
+        active = true
+        if (client.screen == null) client.mouseHandler.releaseMouse()
+    }
+
+    private fun close(client: Minecraft) {
+        active = false
+        hitboxes.clear()
+        if (client.screen == null) client.mouseHandler.grabMouse()
+    }
+
+    private fun render(graphics: GuiGraphics, font: Font, mouseX: Int, mouseY: Int) {
         val names = MacroRuntime.runningNames()
         val x = 8
         val y = 8
@@ -58,8 +81,29 @@ object MacroRuntimeViewerOverlay {
     }
 
     fun mouseClicked(mouseX: Int, mouseY: Int): Boolean {
+        if (!active) return false
         val hit = hitboxes.firstOrNull { mouseX in it.x..(it.x + it.width) && mouseY in it.y..(it.y + it.height) } ?: return false
         MacroRuntime.stopMatching(hit.macroName)
         return true
+    }
+
+    fun handleMouseButton(window: Long, button: Int, action: Int): Boolean {
+        val client = Minecraft.getInstance()
+        if (!active || client.screen != null || window != client.window.handle()) return false
+        client.mouseHandler.releaseMouse()
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
+            val mouse = scaledMouse(client)
+            mouseClicked(mouse.first, mouse.second)
+        }
+        return true
+    }
+
+    private fun scaledMouse(client: Minecraft): Pair<Int, Int> {
+        val rawX = DoubleArray(1)
+        val rawY = DoubleArray(1)
+        GLFW.glfwGetCursorPos(client.window.handle(), rawX, rawY)
+        val x = (rawX[0] * client.window.guiScaledWidth / client.window.width).toInt()
+        val y = (rawY[0] * client.window.guiScaledHeight / client.window.height).toInt()
+        return x to y
     }
 }
