@@ -8,6 +8,7 @@ This repository keeps each Minecraft target in its own Gradle project:
 | --- | --- | --- |
 | 1.8.9 | Forge | `versions/1.8.9-forge` |
 | 1.21.4 | Fabric | `versions/1.21.4-fabric` |
+| 1.21.11 | Fabric | `versions/1.21.11-fabric` |
 | Other versions | Fabric | `versions/<version>-fabric` |
 
 The root Gradle project only exposes helper tasks so IntelliJ can choose the target version from one workspace:
@@ -16,6 +17,9 @@ The root Gradle project only exposes helper tasks so IntelliJ can choose the tar
 gradlew.bat buildFabric1214
 gradlew.bat testFabric1214
 gradlew.bat runFabric1214
+gradlew.bat buildFabric12111
+gradlew.bat testFabric12111
+gradlew.bat runFabric12111
 gradlew.bat setupForge189
 gradlew.bat buildForge189
 gradlew.bat runForge189
@@ -82,6 +86,28 @@ gradlew.bat runClient
 The Fabric mod jar is generated in `versions/1.21.4-fabric/build/libs`.
 
 The Fabric source is Kotlin-only and lives under `versions/1.21.4-fabric/src/main/kotlin/github/xitadoptus/macro`.
+
+## Build Fabric 1.21.11
+
+Use Java 21 or newer.
+
+From the repository root:
+
+```bat
+gradlew.bat buildFabric12111
+gradlew.bat runFabric12111
+```
+
+Or directly from `versions/1.21.11-fabric`:
+
+```bat
+gradlew.bat build
+gradlew.bat runClient
+```
+
+The Fabric mod jar is generated in `versions/1.21.11-fabric/build/libs`.
+
+The Fabric source is Kotlin-only and lives under `versions/1.21.11-fabric/src/main/kotlin/github/xitadoptus/macro`.
 
 ## In Game
 
