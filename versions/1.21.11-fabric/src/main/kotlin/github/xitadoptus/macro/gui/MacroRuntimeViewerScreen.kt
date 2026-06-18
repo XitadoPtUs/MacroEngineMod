@@ -23,8 +23,6 @@ object MacroRuntimeViewerOverlay {
 
     fun onClientTick(client: Minecraft) {
         if (!active) return
-        if (client.screen != null) return
-        client.mouseHandler.releaseMouse()
     }
 
     fun renderHud(graphics: GuiGraphics) {
@@ -41,13 +39,11 @@ object MacroRuntimeViewerOverlay {
 
     private fun open(client: Minecraft) {
         active = true
-        if (client.screen == null) client.mouseHandler.releaseMouse()
     }
 
     private fun close(client: Minecraft) {
         active = false
         hitboxes.clear()
-        if (client.screen == null) client.mouseHandler.grabMouse()
     }
 
     private fun render(graphics: GuiGraphics, font: Font, mouseX: Int, mouseY: Int) {
@@ -90,12 +86,7 @@ object MacroRuntimeViewerOverlay {
     fun handleMouseButton(window: Long, button: Int, action: Int): Boolean {
         val client = Minecraft.getInstance()
         if (!active || client.screen != null || window != client.window.handle()) return false
-        client.mouseHandler.releaseMouse()
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS) {
-            val mouse = scaledMouse(client)
-            mouseClicked(mouse.first, mouse.second)
-        }
-        return true
+        return false
     }
 
     private fun scaledMouse(client: Minecraft): Pair<Int, Int> {

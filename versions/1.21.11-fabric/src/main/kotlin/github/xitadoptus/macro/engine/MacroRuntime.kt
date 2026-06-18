@@ -193,6 +193,10 @@ object MacroRuntime {
     }
 
     private fun handleRuntimeViewerKey(client: Minecraft) {
+        if (client.screen != null) {
+            runtimeViewerWasPressed = false
+            return
+        }
         val viewerKey = KeyboardUtils.normalizeKey(MacroStorage.config.runtimeViewerKey)
         if (!KeyboardUtils.isValidKeyName(viewerKey) || viewerKey == "NONE") return
         val pressed = KeyboardUtils.isInputPressed(viewerKey)

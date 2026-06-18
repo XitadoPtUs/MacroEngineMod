@@ -321,6 +321,7 @@ Key binding aliases include `attack`, `use`, `jump`, `sneak`, `sprint`, `forward
 | `GETIDREL(x, y, z, #idOut, #metaOut)` | Reads block id/meta relative to the player. |
 | `GETBLOCKINFO(x, y, z, #idOut, #metaOut, &nameOut, &registryOut)` | Reads block id, meta, localized name, and registry key. |
 | `GETBLOCKINFOREL(x, y, z, #idOut, #metaOut, &nameOut, &registryOut)` | Relative version of `GETBLOCKINFO`. |
+| `GETNEARESTNAMETAG(&out, radius, includePlayers, filter)` | Fabric 1.21.11: stores the nearest custom entity nametag within `radius`, optionally containing `filter`. Also fills `NEARESTNAMETAG*` helper variables. |
 | `CALCYAWTO(x, z, #yawOut, #distanceOut)` | Calculates yaw and horizontal distance to a point. |
 | `CALCPITCHTO(x, y, z, #pitchOut, #distanceOut)` | Calculates pitch and distance to a point. |
 | `CALCAIMTO(x, y, z, #yawOut, #pitchOut, #distanceOut)` | Calculates yaw, pitch, and distance. |

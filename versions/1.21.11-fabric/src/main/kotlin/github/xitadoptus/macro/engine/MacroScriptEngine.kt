@@ -20,7 +20,9 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import net.minecraft.sounds.SoundSource
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.inventory.ClickType
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
@@ -307,6 +309,7 @@ class MacroScriptEngine(
             "ITEMNAME" -> itemName(statement.args, args)
             "GETITEMINFO" -> getItemInfo(statement.args, args)
             "TRACE" -> trace(args)
+            "GETNEARESTNAMETAG" -> getNearestNametag(statement.args, args)
             "KEY" -> key(args.firstOrNull(), pulse = true)
             "KEYDOWN" -> key(args.firstOrNull(), down = true)
             "KEYUP" -> key(args.firstOrNull(), down = false)
@@ -700,6 +703,53 @@ class MacroScriptEngine(
 
     private fun trace(args: List<String>) {
         hitVar("HIT")
+    }
+
+    private fun getNearestNametag(rawArgs: List<String>, args: List<String>) {
+        val output = rawArgs.getOrNull(0)
+        val player = mc.player
+        val level = mc.level
+        if (player == null || level == null) {
+            setNearestNametagVars(output, null)
+            return
+        }
+
+        val radius = (args.getOrNull(1)?.toDoubleOrNull() ?: 16.0).coerceAtLeast(0.0)
+        val includePlayers = truthy(args.getOrNull(2))
+        val filter = ClientUtils.stripColors(args.getOrNull(3).orEmpty()).trim()
+        val radiusSqr = radius * radius
+        val searchBox = player.boundingBox.inflate(radius)
+        val nearest = level.getEntities(player, searchBox).asSequence()
+            .mapNotNull { entity ->
+                val text = nametagText(entity, includePlayers)
+                if (text.isBlank()) return@mapNotNull null
+                if (filter.isNotEmpty() && !ClientUtils.stripColors(text).contains(filter, ignoreCase = true)) return@mapNotNull null
+
+                val distanceSqr = player.distanceToSqr(entity.x, entity.y, entity.z)
+                if (distanceSqr > radiusSqr) null else NearestNametag(entity, text, distanceSqr)
+            }
+            .minByOrNull { it.distanceSqr }
+
+        setNearestNametagVars(output, nearest)
+    }
+
+    private fun nametagText(entity: Entity, includePlayers: Boolean): String {
+        val customName = entity.customName?.string.orEmpty()
+        if (customName.isNotBlank()) return customName
+        return if (includePlayers && entity is Player) entity.gameProfile.name else ""
+    }
+
+    private fun setNearestNametagVars(output: String?, nearest: NearestNametag?) {
+        val text = nearest?.text.orEmpty()
+        setVar(output, text)
+        setVar("NEARESTNAMETAG", text)
+        setVar("NEARESTNAMETAGCLEAN", ClientUtils.stripColors(text))
+        setVar("NEARESTNAMETAGDISTANCE", nearest?.let { sqrt(it.distanceSqr).toString() }.orEmpty())
+        setVar("NEARESTNAMETAGUUID", nearest?.entity?.uuid?.toString().orEmpty())
+        setVar("NEARESTNAMETAGTYPE", nearest?.entity?.let { BuiltInRegistries.ENTITY_TYPE.getKey(it.type).toString() }.orEmpty())
+        setVar("NEARESTNAMETAGX", nearest?.entity?.x?.toString().orEmpty())
+        setVar("NEARESTNAMETAGY", nearest?.entity?.y?.toString().orEmpty())
+        setVar("NEARESTNAMETAGZ", nearest?.entity?.z?.toString().orEmpty())
     }
 
     private fun evalValue(raw: String): String {
@@ -1662,6 +1712,7 @@ class MacroScriptEngine(
 
     private data class Branch(val token: MacroStatement, val start: Int, val end: Int)
     private data class AimResult(val yaw: Float, val pitch: Float, val distance: Double)
+    private data class NearestNametag(val entity: Entity, val text: String, val distanceSqr: Double)
     private class StopMacro : RuntimeException()
     private class BreakLoop : RuntimeException()
 

@@ -19,6 +19,7 @@ import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
+import net.minecraft.util.Util
 import java.awt.Color
 
 class MacroScreen(private val previousScreen: Screen?) : Screen(Component.literal("MacroEngine")) {
@@ -67,6 +68,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         recorderStopButton = addButton(10, left + listWidth + 340, buttonY, 104, 20, "Stop: ${MacroStorage.config.recorderStopKey}")
         builderButton = addButton(11, left + listWidth + 16, builderY, 124, 20, builderButtonText())
         runtimeViewerButton = addButton(13, left + listWidth + 146, builderY, 112, 20, "Viewer: ${MacroStorage.config.runtimeViewerKey}")
+        addButton(14, left + listWidth + 264, builderY, 96, 20, "Folder")
         addButton(0, right - 62, buttonY, 62, 20, "Back")
 
         nameField = EditBox(font, left + listWidth + 18, top + 46, right - left - listWidth - 36, 18, Component.literal("")).also {
@@ -265,6 +267,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
                 waitingForBind = false
                 waitingForRecorderStopBind = false
             }
+            14 -> openMacrosFolder()
         }
         refreshButtons()
     }
@@ -459,6 +462,19 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         val command = editor.text.lineSequence().firstOrNull { it.trim().startsWith("/") }?.trim() ?: "/vip"
         if (StepBuilderCaptureController.start(name, command)) {
             minecraft!!.setScreen(null)
+        }
+    }
+
+    private fun openMacrosFolder() {
+        saveSelection()
+        MacroRuntime.save()
+        val folder = MacroStorage.macrosDir
+        if (!folder.exists()) folder.mkdirs()
+        runCatching {
+            Util.getPlatform().openPath(folder.toPath())
+        }.onFailure {
+            ClientUtils.displayChatMessage("\u00A7c[MacroEngine] Failed to open macros folder: \u00A7f${folder.absolutePath}")
+            ClientUtils.logError("[MacroEngine] Failed to open macros folder", it)
         }
     }
 
