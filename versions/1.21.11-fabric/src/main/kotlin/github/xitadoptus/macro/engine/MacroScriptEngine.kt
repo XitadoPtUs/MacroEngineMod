@@ -215,13 +215,19 @@ class MacroScriptEngine(
             }
         } else {
             val rows = iteratorRows(statement.args.getOrNull(0).orEmpty())
-            for (row in rows) {
-                row.forEach { (key, value) -> setLocalVar(key, value) }
-                try {
-                    executeRange(statements, forIndex + 1, loopEnd)
-                } catch (_: BreakLoop) {
-                    break
+            val savedLocals = HashMap(localVariables)
+            try {
+                for (row in rows) {
+                    row.forEach { (key, value) -> setLocalVar(key, value) }
+                    try {
+                        executeRange(statements, forIndex + 1, loopEnd)
+                    } catch (_: BreakLoop) {
+                        break
+                    }
                 }
+            } finally {
+                localVariables.clear()
+                localVariables.putAll(savedLocals)
             }
         }
 
@@ -260,8 +266,8 @@ class MacroScriptEngine(
             "LOG" -> if (args.isNotEmpty()) ClientUtils.displayChatMessage(ClientUtils.color(args.joinToString(",")))
             "LOGRAW" -> if (args.isNotEmpty()) ClientUtils.displayChatMessage(args.joinToString(","))
             "WAIT" -> sleepInterruptibly(parseWait(args.firstOrNull() ?: "1"))
-            "WAITUNTIL" -> waitUntil(statement.args.getOrNull(0).orEmpty())
-            "WAITWHILE" -> waitWhile(statement.args.getOrNull(0).orEmpty())
+            "WAITUNTIL" -> waitUntil(statement.args.getOrNull(0).orEmpty(), args.getOrNull(1))
+            "WAITWHILE" -> waitWhile(statement.args.getOrNull(0).orEmpty(), args.getOrNull(1))
             "WAITINVENTORYFULL" -> waitInventoryFull()
             "GOTO" -> goTo(args)
             "PAUSEMACRO" -> pauseMacro(args.firstOrNull() ?: "paused")
@@ -359,7 +365,7 @@ class MacroScriptEngine(
             "PLAYSOUND" -> playSound(args)
             "ISRUNNING" -> setVar(statement.args.getOrNull(1), MacroRuntime.isRunning(args.firstOrNull().orEmpty()).toString())
             "CONFIG" -> config(args.firstOrNull())
-            "IMPORT" -> MacroRuntime.stores.computeIfAbsent("IMPORTS") { mutableListOf() }.add(args.firstOrNull().orEmpty())
+            "IMPORT" -> MacroRuntime.stores.computeIfAbsent("IMPORTS") { java.util.concurrent.CopyOnWriteArrayList<String>() }.add(args.firstOrNull().orEmpty())
             "UNIMPORT" -> MacroRuntime.stores["IMPORTS"]?.remove(args.firstOrNull().orEmpty())
             "LOGTO" -> logTo(args)
             "PROMPT" -> prompt(statement.args, args)
@@ -550,7 +556,9 @@ class MacroScriptEngine(
         val min = minArg?.toIntOrNull() ?: 0
         val low = min.coerceAtMost(max)
         val high = min.coerceAtLeast(max)
-        setVar(target, (low + random.nextInt(high - low + 1)).toString())
+        val span = high.toLong() - low.toLong() + 1L
+        val offset = if (span <= 1L) 0L else (random.nextDouble() * span).toLong().coerceIn(0L, span - 1L)
+        setVar(target, (low + offset).toString())
     }
 
     private fun replaceVar(rawArgs: List<String>, regex: Boolean) {
@@ -718,8 +726,9 @@ class MacroScriptEngine(
         val includePlayers = truthy(args.getOrNull(2))
         val filter = ClientUtils.stripColors(args.getOrNull(3).orEmpty()).trim()
         val radiusSqr = radius * radius
-        val searchBox = player.boundingBox.inflate(radius)
-        val nearest = level.getEntities(player, searchBox).asSequence()
+        val nearest = onMain<NearestNametag?>(null) {
+            val searchBox = player.boundingBox.inflate(radius)
+            level.getEntities(player, searchBox).asSequence()
             .mapNotNull { entity ->
                 val text = nametagText(entity, includePlayers)
                 if (text.isBlank()) return@mapNotNull null
@@ -729,6 +738,7 @@ class MacroScriptEngine(
                 if (distanceSqr > radiusSqr) null else NearestNametag(entity, text, distanceSqr)
             }
             .minByOrNull { it.distanceSqr }
+        }
 
         setNearestNametagVars(output, nearest)
     }
@@ -835,11 +845,20 @@ class MacroScriptEngine(
         val binding = keyBinding(bind)
         schedule {
             if (binding != null) {
-                if (pulse) {
-                    binding.isDown = true
-                    binding.isDown = false
-                } else if (down != null) {
-                    binding.isDown = down
+                // Mirror a real key press: vanilla sets isDown AND increments the click counter.
+                // Click-driven actions (use/right-click, inventory, drop, hotbar, swap) only fire via
+                // KeyMapping.click(); setting isDown alone — the old behaviour — never triggered them.
+                when {
+                    pulse -> {
+                        binding.isDown = true
+                        runCatching { KeyMapping.click(InputConstants.getKey(binding.saveString())) }
+                        binding.isDown = false
+                    }
+                    down == true -> {
+                        binding.isDown = true
+                        runCatching { KeyMapping.click(InputConstants.getKey(binding.saveString())) }
+                    }
+                    down == false -> binding.isDown = false
                 }
             } else {
                 if (pulse) KeyboardUtils.pulse(bind) else if (down != null) KeyboardUtils.set(bind, down)
@@ -893,10 +912,11 @@ class MacroScriptEngine(
 
     private fun getSlot(rawArgs: List<String>, args: List<String>) {
         val item = args.getOrNull(0).orEmpty()
-        val start = args.getOrNull(2)?.toIntOrNull() ?: 0
-        val inventory = mc.player?.inventory?.getNonEquipmentItems().orEmpty()
-        val slot = inventory.drop(start.coerceAtLeast(0)).indexOfFirst { !it.isEmpty && itemMatches(it, item) }
-        setVar(rawArgs.getOrNull(1), if (slot < 0) "-1" else (slot + start.coerceAtLeast(0)).toString())
+        val start = (args.getOrNull(2)?.toIntOrNull() ?: 0).coerceAtLeast(0)
+        val slot = onMain(-1) {
+            mc.player?.inventory?.getNonEquipmentItems().orEmpty().drop(start).indexOfFirst { !it.isEmpty && itemMatches(it, item) }
+        }
+        setVar(rawArgs.getOrNull(1), if (slot < 0) "-1" else (slot + start).toString())
     }
 
     private fun getSlotItem(rawArgs: List<String>, args: List<String>) {
@@ -1158,7 +1178,7 @@ class MacroScriptEngine(
     private fun store(args: List<String>, overwrite: Boolean) {
         val type = args.getOrNull(0)?.uppercase(Locale.ROOT) ?: return
         val value = args.getOrNull(1).orEmpty()
-        val store = MacroRuntime.stores.computeIfAbsent(type) { mutableListOf() }
+        val store = MacroRuntime.stores.computeIfAbsent(type) { java.util.concurrent.CopyOnWriteArrayList<String>() }
         if (overwrite) store.remove(value)
         store += value
     }
@@ -1270,24 +1290,41 @@ class MacroScriptEngine(
         }
     }
 
-    private fun waitUntil(rawCondition: String) {
+    private fun waitUntil(rawCondition: String, timeoutArg: String? = null) {
+        val deadline = waitDeadline(timeoutArg)
         while (true) {
             if (!runningTasks.contains(taskId)) throw StopMacro()
             if (evalCondition(rawCondition)) break
+            if (deadline != 0L && System.currentTimeMillis() >= deadline) break
             Thread.sleep(50L)
         }
     }
 
-    private fun waitWhile(rawCondition: String) {
+    private fun waitWhile(rawCondition: String, timeoutArg: String? = null) {
+        val deadline = waitDeadline(timeoutArg)
         while (true) {
             if (!runningTasks.contains(taskId)) throw StopMacro()
             if (!evalCondition(rawCondition)) break
+            if (deadline != 0L && System.currentTimeMillis() >= deadline) break
             Thread.sleep(50L)
         }
+    }
+
+    private fun waitDeadline(timeoutArg: String?): Long {
+        val timeout = timeoutArg?.takeIf { it.isNotBlank() }?.let { parseWait(it) } ?: 0L
+        return if (timeout > 0L) System.currentTimeMillis() + timeout else 0L
     }
 
     private fun schedule(action: () -> Unit) {
         mc.execute(Runnable { action() })
+    }
+
+
+    private fun <T> onMain(fallback: T, block: () -> T): T {
+        if (mc.isSameThread) return runCatching(block).getOrDefault(fallback)
+        val future = java.util.concurrent.CompletableFuture<T>()
+        mc.execute { future.complete(runCatching(block).getOrDefault(fallback)) }
+        return runCatching { future.get(5, java.util.concurrent.TimeUnit.SECONDS) }.getOrDefault(fallback)
     }
 
     private fun unquote(text: String): String {
@@ -1371,7 +1408,7 @@ class MacroScriptEngine(
         return when {
             key.endsWith("ID") -> BuiltInRegistries.ITEM.getId(stack.item).toString()
             key.endsWith("NAME") -> stack.hoverName.string
-            key.endsWith("DAMAGE") -> stack.maxDamage.toString()
+            key.endsWith("DAMAGE") -> stack.damageValue.toString()
             key.endsWith("DURABILITY") -> (stack.maxDamage - stack.damageValue).toString()
             else -> null
         }
@@ -1451,7 +1488,7 @@ class MacroScriptEngine(
 
     private fun mutableArray(raw: String): MutableList<String> {
         val name = parseArrayRef(raw)?.first ?: MacroScriptParser.cleanVarName(raw)
-        return MacroRuntime.arrays.computeIfAbsent(name) { mutableListOf() }
+        return MacroRuntime.arrays.computeIfAbsent(name) { java.util.concurrent.CopyOnWriteArrayList<String>() }
     }
 
     private fun isVariableRef(raw: String): Boolean {
@@ -1466,8 +1503,9 @@ class MacroScriptEngine(
 
     private fun iteratorRows(rawIterator: String): List<Map<String, String>> {
         val iterator = replaceVars(rawIterator).substringBefore('(').substringBefore(':').trim().lowercase(Locale.ROOT)
+        return onMain(emptyList<Map<String, String>>()) {
         val player = mc.player
-        return when (iterator) {
+        when (iterator) {
             "players" -> mc.connection?.listedOnlinePlayers?.mapIndexed { index, info ->
                 mapOf("INDEX" to index.toString(), "PLAYER" to info.profile.name, "PLAYERNAME" to info.profile.name, "UUID" to info.profile.id.toString())
             }.orEmpty()
@@ -1483,6 +1521,7 @@ class MacroScriptEngine(
             "properties" -> propertyRows()
             "controls" -> MacroRuntime.guiProperties.entries.mapIndexed { index, entry -> mapOf("INDEX" to index.toString(), "CONTROL" to entry.key, "VALUE" to entry.value) }
             else -> emptyList()
+        }
         }
     }
 

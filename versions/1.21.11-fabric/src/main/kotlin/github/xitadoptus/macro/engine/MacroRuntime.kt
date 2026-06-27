@@ -222,6 +222,11 @@ object MacroRuntime {
             fireEvent("onJoinGame")
             fireEvent("onWorldChange")
         } else if (!present && lastWorldPresent) {
+            // Leaving the world / disconnecting: stop any macros still running so they don't
+            // keep looping on a dead client.
+            if (stopAll(showMessage = false)) {
+                ClientUtils.displayChatMessage("§c[MacroEngine] Left the world — all running macros stopped.")
+            }
             fireEvent("onWorldChange")
         }
         lastWorldPresent = present

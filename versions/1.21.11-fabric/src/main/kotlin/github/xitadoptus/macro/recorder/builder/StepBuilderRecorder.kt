@@ -27,8 +27,12 @@ class StepBuilderRecorder(private val autoWaypointDistance: Double = 2.0) {
 
     fun recordAutomaticWaypoint(waypoint: RouteWaypoint): Boolean {
         val last = routeToSell.lastOrNull()
-        if (last != null && WaypointMath.horizontalDistance(last.x, last.z, waypoint.x, waypoint.z) < autoWaypointDistance) {
-            return false
+        if (last != null) {
+            val horizontal = WaypointMath.horizontalDistance(last.x, last.z, waypoint.x, waypoint.z)
+            val vertical = kotlin.math.abs(last.y - waypoint.y)
+            if (horizontal < autoWaypointDistance && vertical < autoWaypointDistance) {
+                return false
+            }
         }
         addWaypoint(waypoint.copy(manual = false))
         return true

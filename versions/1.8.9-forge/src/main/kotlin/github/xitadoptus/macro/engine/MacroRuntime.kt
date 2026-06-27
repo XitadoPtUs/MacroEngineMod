@@ -123,6 +123,16 @@ object MacroRuntime : MinecraftInstance() {
         return true
     }
 
+    fun stopAll(showMessage: Boolean = true): Boolean {
+        if (running.isEmpty()) return false
+        running.clear()
+        runningLabels.clear()
+        previousKeyState.clear()
+        releaseHeldInputs()
+        if (showMessage) ClientUtils.displayChatMessage("§c[MacroEngine] All macros stopped.")
+        return true
+    }
+
     fun fireEvent(event: String, locals: Map<String, String> = emptyMap()) {
         ensureLoaded()
         MacroStorage.config.events
@@ -169,6 +179,9 @@ object MacroRuntime : MinecraftInstance() {
             fireEvent("onJoinGame")
             fireEvent("onWorldChange")
         } else if (!present && lastWorldPresent) {
+            if (stopAll(showMessage = false)) {
+                ClientUtils.displayChatMessage("§c[MacroEngine] Left the world — all running macros stopped.")
+            }
             fireEvent("onWorldChange")
         }
         lastWorldPresent = present

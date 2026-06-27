@@ -51,14 +51,20 @@ object MacroStorage {
     }
 
     fun scriptFile(name: String): File {
-        val clean = name.trim().removeSuffix(".txt")
+        val clean = name.trim().removeSuffix(".txt").replace('\\', '/').substringAfterLast('/').ifBlank { "macro" }
         return File(macrosDir, "$clean.txt")
     }
 
     fun readScriptFile(name: String): String? {
         val direct = File(macrosDir, name.trim())
-        val file = if (direct.exists()) direct else scriptFile(name)
+        val file = if (isInsideMacros(direct) && direct.exists()) direct else scriptFile(name)
         return if (file.exists() && file.isFile) file.readText(Charsets.UTF_8) else null
+    }
+
+    private fun isInsideMacros(file: File): Boolean {
+        val base = runCatching { macrosDir.canonicalPath }.getOrDefault(macrosDir.absolutePath)
+        val target = runCatching { file.canonicalPath }.getOrDefault(file.absolutePath)
+        return target == base || target.startsWith(base + File.separator)
     }
 
     private fun ensureFolders() {

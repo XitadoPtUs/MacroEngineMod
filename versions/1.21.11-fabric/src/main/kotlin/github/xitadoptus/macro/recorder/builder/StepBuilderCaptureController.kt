@@ -11,8 +11,6 @@ import net.minecraft.world.phys.BlockHitResult
 import java.awt.Color
 
 object StepBuilderCaptureController {
-    private const val MARK_KEY = "B"
-    private const val TARGET_KEY = "N"
     private val recorder = StepBuilderRecorder()
 
     @Volatile
@@ -33,10 +31,10 @@ object StepBuilderCaptureController {
         recorder.start(name)
         recorder.setCommand(command)
         active = true
-        markWasPressed = false
-        targetWasPressed = false
+        markWasPressed = KeyboardUtils.isInputPressed(MacroStorage.config.stepBuilderMarkKey)
+        targetWasPressed = KeyboardUtils.isInputPressed(MacroStorage.config.stepBuilderTargetKey)
         stopWasPressed = KeyboardUtils.isInputPressed(MacroStorage.config.recorderStopKey)
-        status = "Step builder: B mark, N target, ${MacroStorage.config.recorderStopKey} finish"
+        status = "Step builder: ${MacroStorage.config.stepBuilderMarkKey} mark, ${MacroStorage.config.stepBuilderTargetKey} target, ${MacroStorage.config.recorderStopKey} finish"
         ClientUtils.displayChatMessage("\u00A7a[MacroEngine] Step builder started.")
         return true
     }
@@ -71,9 +69,15 @@ object StepBuilderCaptureController {
     }
 
     private fun handleHotkeys(client: Minecraft) {
-        val markPressed = KeyboardUtils.isInputPressed(MARK_KEY)
-        val targetPressed = KeyboardUtils.isInputPressed(TARGET_KEY)
-        val stopPressed = KeyboardUtils.isInputPressed(MacroStorage.config.recorderStopKey)
+        val stopKey = MacroStorage.config.recorderStopKey
+        val markKey = MacroStorage.config.stepBuilderMarkKey
+        val targetKey = MacroStorage.config.stepBuilderTargetKey
+
+        val stopPressed = KeyboardUtils.isInputPressed(stopKey)
+        // If a mark/target key collides with the stop key (or each other), the stop/mark wins so a
+        // single physical key can't both mark a waypoint and finish in the same tick.
+        val markPressed = markKey != stopKey && KeyboardUtils.isInputPressed(markKey)
+        val targetPressed = targetKey != stopKey && targetKey != markKey && KeyboardUtils.isInputPressed(targetKey)
 
         if (markPressed && !markWasPressed) markManualWaypoint(client)
         if (targetPressed && !targetWasPressed) setTarget(client)

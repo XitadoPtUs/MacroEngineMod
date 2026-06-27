@@ -34,6 +34,16 @@ class StepBuilderRecorderTest {
     }
 
     @Test
+    fun recordsAutomaticWaypointAfterVerticalMovement() {
+        val recorder = StepBuilderRecorder(autoWaypointDistance = 2.0)
+
+        recorder.start("Vertical")
+        assertEquals(true, recorder.recordAutomaticWaypoint(RouteWaypoint(x = 0.0, y = 64.0, z = 0.0)))
+        assertEquals(true, recorder.recordAutomaticWaypoint(RouteWaypoint(x = 0.0, y = 67.0, z = 0.0)))
+        assertEquals(false, recorder.recordAutomaticWaypoint(RouteWaypoint(x = 0.5, y = 67.5, z = 0.0)))
+    }
+
+    @Test
     fun exposesCapturedRouteAndTargetForPreview() {
         val recorder = StepBuilderRecorder()
         val waypoint = RouteWaypoint(x = 4.0, y = 65.0, z = 8.0)

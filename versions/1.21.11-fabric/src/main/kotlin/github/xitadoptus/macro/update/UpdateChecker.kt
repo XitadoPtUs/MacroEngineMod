@@ -13,7 +13,6 @@ import net.minecraft.util.Util
 import java.awt.Color
 import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 import java.util.concurrent.Executors
 
 data class ReleaseUpdate(val tag: String, val url: String)
@@ -52,13 +51,17 @@ object UpdateChecker {
 
     private fun fetchUpdate(): ReleaseUpdate? {
         return runCatching {
-            val connection = URL(API_URL).openConnection() as HttpURLConnection
-            connection.connectTimeout = 4000
-            connection.readTimeout = 4000
-            connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.setRequestProperty("User-Agent", "${MacroMod.MOD_ID}/${MacroMod.VERSION}")
-            if (connection.responseCode !in 200..299) return@runCatching null
-            connection.inputStream.bufferedReader(Charsets.UTF_8).use { parseRelease(it.readText()) }
+            val connection = URI(API_URL).toURL().openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 4000
+                connection.readTimeout = 4000
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.setRequestProperty("User-Agent", "${MacroMod.MOD_ID}/${MacroMod.VERSION}")
+                if (connection.responseCode !in 200..299) return@runCatching null
+                connection.inputStream.bufferedReader(Charsets.UTF_8).use { parseRelease(it.readText()) }
+            } finally {
+                connection.disconnect()
+            }
         }.onFailure {
             ClientUtils.logError("[MacroEngine] Update check failed", it)
         }.getOrNull()

@@ -12,7 +12,7 @@ import java.util.Locale
 
 object MacroRecorder {
     private const val COUNTDOWN_MS = 3000L
-    private const val LOOK_INTERVAL_MS = 50L
+    private const val LOOK_INTERVAL_MS = 20L
     private const val LOOK_DELTA = 0.25f
 
     private val inputNames = listOf(
@@ -92,6 +92,20 @@ object MacroRecorder {
             }
             RecorderState.IDLE -> false
         }
+    }
+
+    // Sampled once per rendered frame (wired through WorldRenderEvents) so fast clicks/taps and
+    // quick camera turns are captured at the monitor's refresh rate instead of only 20x per second.
+    // The input tracker and the slot/look dedup guards make this idempotent with the per-tick
+    // sampling, so running both is safe and just adds finer detail.
+    fun captureFrame() {
+        if (state != RecorderState.RECORDING) return
+        val client = Minecraft.getInstance()
+        if (client.level == null || client.player == null) return
+        val elapsed = elapsedMillis()
+        actions += tracker.update(elapsed, sampleInputs(client))
+        captureSlot(client, elapsed)
+        captureLook(client, elapsed)
     }
 
     fun renderOverlay(graphics: GuiGraphics) {

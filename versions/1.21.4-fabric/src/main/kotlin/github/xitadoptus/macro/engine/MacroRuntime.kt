@@ -218,6 +218,9 @@ object MacroRuntime {
             fireEvent("onJoinGame")
             fireEvent("onWorldChange")
         } else if (!present && lastWorldPresent) {
+            if (stopAll(showMessage = false)) {
+                ClientUtils.displayChatMessage("§c[MacroEngine] Left the world — all running macros stopped.")
+            }
             fireEvent("onWorldChange")
         }
         lastWorldPresent = present

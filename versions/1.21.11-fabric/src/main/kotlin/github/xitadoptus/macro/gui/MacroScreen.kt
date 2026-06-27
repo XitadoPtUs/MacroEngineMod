@@ -41,6 +41,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     private var runButton: Button? = null
     private var deleteButton: Button? = null
     private var enabledButton: Button? = null
+    private var deletePending = false
     private val renderedWidgets = mutableListOf<Renderable>()
 
     override fun init() {
@@ -137,6 +138,7 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
             if (index in itemLabels().indices) {
                 saveSelection()
                 selectedIndex = index
+                deletePending = false
                 loadSelection()
                 refreshButtons()
                 return true
@@ -237,6 +239,8 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
     }
 
     private fun handleButton(id: Int) {
+        // Any button other than Delete cancels a pending delete confirmation.
+        if (id != 3) deletePending = false
         when (id) {
             0 -> saveAndClose()
             1 -> newEntry()
@@ -245,7 +249,12 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
                 MacroRuntime.save()
                 ClientUtils.displayChatMessage("\u00A7a[MacroEngine] Saved.")
             }
-            3 -> deleteEntry()
+            3 -> if (deletePending) {
+                deletePending = false
+                deleteEntry()
+            } else {
+                deletePending = true
+            }
             4 -> runCurrent()
             5 -> if (mode == Mode.MACROS) {
                 waitingForBind = true
@@ -493,6 +502,11 @@ class MacroScreen(private val previousScreen: Screen?) : Screen(Component.litera
         runtimeViewerButton?.message = MacroFonts.text(if (waitingForRuntimeViewerBind) "Press key" else "Viewer: ${MacroStorage.config.runtimeViewerKey}")
         runButton?.active = if (mode == Mode.MACROS) currentMacro() != null else currentEvent() != null
         deleteButton?.active = itemLabels().isNotEmpty()
+        deleteButton?.message = if (deletePending) {
+            Component.literal("Confirm?").setStyle(MacroFonts.STYLE.withColor(ChatFormatting.RED))
+        } else {
+            MacroFonts.text("Delete")
+        }
         enabledButton?.message = MacroFonts.text(if (currentEnabled()) "Enabled" else "Disabled")
     }
 

@@ -24,7 +24,12 @@ import java.io.File
 object MacroMod : ClientModInitializer {
     const val MOD_ID = "macroengine"
     const val NAME = "MacroEngine"
-    const val VERSION = "1.0.0"
+
+    val VERSION: String
+        get() = net.fabricmc.loader.api.FabricLoader.getInstance()
+            .getModContainer(MOD_ID)
+            .map { it.metadata.version.friendlyString }
+            .orElse("1.0.0")
 
     @Volatile
     private var pendingGuiOpen = false
@@ -61,6 +66,7 @@ object MacroMod : ClientModInitializer {
         }
 
         WorldRenderEvents.AFTER_ENTITIES.register { context ->
+            MacroRecorder.captureFrame()
             StepBuilderWorldPreview.render(context, StepBuilderPreviewState.snapshot())
             StepBuilderCaptureController.renderWorld(context)
         }

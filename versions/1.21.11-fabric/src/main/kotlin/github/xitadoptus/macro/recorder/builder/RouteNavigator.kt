@@ -14,18 +14,18 @@ class RouteNavigator(
         var bypassAttempts = 0
 
         while (System.currentTimeMillis() - start <= waypoint.timeoutMillis && running()) {
-            val player = client.player ?: return false
-            if (WaypointMath.reached(player.x, player.y, player.z, waypoint)) {
+            val sample = sample()
+            if (!sample.present) return false
+            if (WaypointMath.reached(sample.x, sample.y, sample.z, waypoint)) {
                 releaseMovement()
                 return true
             }
 
-            val yaw = WaypointMath.yawTo(player.x, player.z, waypoint.x, waypoint.z)
-            val blockedAhead = blockedAhead()
+            val yaw = WaypointMath.yawTo(sample.x, sample.z, waypoint.x, waypoint.z)
             val flightAction = RouteFlightDecision.choose(
-                blockedAhead = blockedAhead,
-                flying = player.abilities.flying || player.abilities.mayfly,
-                playerY = player.y,
+                blockedAhead = sample.blockedAhead,
+                flying = sample.flying,
+                playerY = sample.y,
                 waypointY = waypoint.y
             )
 
@@ -37,7 +37,7 @@ class RouteNavigator(
                 client.options.keyShift.isDown = flightAction == FlightAction.DESCEND
             })
 
-            if (stuck.update(System.currentTimeMillis(), player.x, player.y, player.z)) {
+            if (stuck.update(System.currentTimeMillis(), sample.x, sample.y, sample.z)) {
                 bypassAttempts++
                 if (bypassAttempts > 2) {
                     releaseMovement()
@@ -45,7 +45,7 @@ class RouteNavigator(
                 }
                 bypass(waypoint.jumpAllowed, bypassAttempts)
                 if (!running()) break
-                stuck.reset(System.currentTimeMillis(), player.x, player.y, player.z)
+                stuck.reset(System.currentTimeMillis(), sample.x, sample.y, sample.z)
             }
 
             Thread.sleep(50L)
@@ -53,6 +53,34 @@ class RouteNavigator(
 
         releaseMovement()
         return false
+    }
+
+    private data class NavSample(
+        val present: Boolean,
+        val x: Double = 0.0,
+        val y: Double = 0.0,
+        val z: Double = 0.0,
+        val flying: Boolean = false,
+        val blockedAhead: Boolean = false
+    )
+
+    private fun sample(): NavSample = onMain(NavSample(present = false)) {
+        val player = client.player ?: return@onMain NavSample(present = false)
+        NavSample(
+            present = true,
+            x = player.x,
+            y = player.y,
+            z = player.z,
+            flying = player.abilities.flying || player.abilities.mayfly,
+            blockedAhead = blockedAhead()
+        )
+    }
+
+    private fun <T> onMain(fallback: T, block: () -> T): T {
+        if (client.isSameThread) return runCatching(block).getOrDefault(fallback)
+        val future = java.util.concurrent.CompletableFuture<T>()
+        client.execute { future.complete(runCatching(block).getOrDefault(fallback)) }
+        return runCatching { future.get(2, java.util.concurrent.TimeUnit.SECONDS) }.getOrDefault(fallback)
     }
 
     fun releaseMovement() {
